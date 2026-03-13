@@ -109,12 +109,15 @@ test.describe('Requirements Analyzer E2E Tests', () => {
     const analyzeBtn = page.locator('[data-testid="analyze-btn"]');
 
     // Type whitespace-only content - the button should remain disabled
-    // because the component checks !value.trim()
     await textarea.fill('   ');
     await expect(analyzeBtn).toBeDisabled();
 
-    // Type minimal content that passes the trim check but might cause an API error
+    // Type short content (< 10 chars) - button should remain disabled (min length validation)
     await textarea.fill('a');
+    await expect(analyzeBtn).toBeDisabled();
+
+    // Type content that meets minimum length (10+ chars) to trigger API call
+    await textarea.fill('짧은 요구사항 테스트입니다.');
     await expect(analyzeBtn).toBeEnabled();
     await analyzeBtn.click();
 
