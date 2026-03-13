@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { parsePDF, parseDOCX, parseTXT } from '@/lib/parsers';
+import { parsePDF, parseDOCX, parseTXT, parseImage } from '@/lib/parsers';
 
 export const maxDuration = 60;
 
@@ -22,7 +22,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.png', '.jpg', '.jpeg'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return Response.json(
-        { error: 'PDF, DOCX, TXT 파일만 업로드할 수 있습니다.' },
+        { error: 'PDF, DOCX, TXT, PNG, JPG 파일만 업로드할 수 있습니다.' },
         { status: 400 }
       );
     }
@@ -74,6 +74,8 @@ export async function POST(request: NextRequest) {
       text = await parsePDF(buffer);
     } else if (ext === '.docx') {
       text = await parseDOCX(buffer);
+    } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
+      text = await parseImage(buffer);
     } else {
       text = await parseTXT(buffer);
     }

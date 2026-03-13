@@ -12,8 +12,10 @@ const ACCEPTED_TYPES = [
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'text/plain',
+  'image/png',
+  'image/jpeg',
 ];
-const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
+const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.png', '.jpg', '.jpeg'];
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 function formatFileSize(bytes: number): string {
@@ -26,7 +28,7 @@ function isValidFile(file: File): { valid: boolean; error?: string } {
   const ext = '.' + file.name.split('.').pop()?.toLowerCase();
   const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext);
   if (!typeOk) {
-    return { valid: false, error: '지원하지 않는 파일 형식입니다. PDF, DOCX, TXT 파일만 업로드할 수 있습니다.' };
+    return { valid: false, error: '지원하지 않는 파일 형식입니다. PDF, DOCX, TXT, PNG, JPG 파일만 업로드할 수 있습니다.' };
   }
   if (file.size > MAX_SIZE_BYTES) {
     return { valid: false, error: `파일 크기가 너무 큽니다. 최대 10MB까지 업로드할 수 있습니다. (현재: ${formatFileSize(file.size)})` };
@@ -197,7 +199,7 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
               파일을 여기에 드래그하거나 클릭하여 업로드
             </p>
             <p className="text-xs text-gray-500">
-              지원 형식: PDF, DOCX, TXT &nbsp;·&nbsp; 최대 크기: 10MB
+              지원 형식: PDF, DOCX, TXT, PNG, JPG &nbsp;·&nbsp; 최대 크기: 10MB
             </p>
           </>
         )}
