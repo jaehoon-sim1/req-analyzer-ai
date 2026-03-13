@@ -1,16 +1,17 @@
 {
   "name": "req-analyzer",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
-    "ai": "^6.0.116",
     "exceljs": "^4.4.0",
     "mammoth": "^1.12.0",
     "next": "16.1.6",

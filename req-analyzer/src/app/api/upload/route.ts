@@ -82,8 +82,10 @@ export async function POST(request: NextRequest) {
 
     return Response.json({ text, filename, fileSize: file.size });
   } catch (error) {
+    const message =
+      error instanceof Error ? error.message : '파일 처리 중 오류가 발생했습니다.';
     return Response.json(
-      { error: '파일 처리 중 오류가 발생했습니다.' },
+      { error: message },
       { status: 500 }
     );
   }
