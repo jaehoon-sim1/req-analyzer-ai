@@ -162,7 +162,7 @@ M0          M1              M2              M3          M4
 #### Sprint 0 검증 결과
 - **코드 리뷰**: 68/100 (Critical 3건, Important 7건, Suggestion 8건) → Sprint 1에서 Critical 이슈 우선 해결
 - **Playwright E2E**: 6/6 PASS (TC-E2E-001~006)
-- **실제 AI 분석**: claude-haiku-4-5 모델, 44.2초, 6개 섹션 정상 출력
+- **실제 AI 분석**: claude-haiku-4-5-20251001 모델, 39.7초 (NFR-001 180초 이내 ✓), 6개 섹션 정상 출력
 - **이월 이슈**: CR-01(API 키 검증), CR-02(프롬프트 인젝션 방어), CR-03(클라이언트 타임아웃)
 
 ### Sprint 1 — Week 3~4
