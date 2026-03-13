@@ -42,7 +42,7 @@ export default function Home() {
           onAnalyze={handleAnalyze}
           onReset={handleReset}
           isLoading={isLoading}
-          data-testid="input-section"
+          testId="input-section"
         />
 
         {/* Step 2: Progress */}
@@ -50,7 +50,7 @@ export default function Home() {
           <ProgressBar
             progress={progress}
             message={progressMessage}
-            data-testid="progress-bar"
+            testId="progress-bar"
           />
         )}
 
@@ -59,7 +59,7 @@ export default function Home() {
 
         {/* Step 3: Results */}
         {result && !isLoading && (
-          <ResultSection result={result} data-testid="result-summary" />
+          <ResultSection result={result} testId="result-summary" />
         )}
       </div>
     </main>

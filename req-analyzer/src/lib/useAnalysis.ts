@@ -1,5 +1,3 @@
-'use client';
-
 import { useState, useCallback } from 'react';
 import type { AnalysisResult, StreamEvent } from '@/types/analysis';
 
@@ -49,8 +47,12 @@ export function useAnalysis(): UseAnalysisReturn {
       });
 
       if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error || '분석 요청에 실패했습니다.');
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+          const errData = await response.json();
+          errorMsg = errData.error || errorMsg;
+        } catch { /* non-JSON response */ }
+        throw new Error(errorMsg);
       }
 
       const reader = response.body?.getReader();

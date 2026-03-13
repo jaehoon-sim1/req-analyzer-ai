@@ -9,15 +9,20 @@ export interface AnalysisResult {
   metadata: AnalysisMetadata;
 }
 
+// 신뢰도 타입
+export type ConfidenceLevel = 'high' | 'medium' | 'low';
+
 // 요약 섹션 (FR-002)
 export interface SummarySection {
   overview: string;
   keyPoints: string[];
+  confidence?: ConfidenceLevel;
 }
 
 // 기능 목록 (FR-003)
 export interface FeatureSection {
   features: Feature[];
+  confidence?: ConfidenceLevel;
 }
 
 export interface Feature {
@@ -30,6 +35,7 @@ export interface Feature {
 // 테스트 포인트 (FR-004)
 export interface TestPointSection {
   testPoints: TestPoint[];
+  confidence?: ConfidenceLevel;
 }
 
 export interface TestPoint {
@@ -42,6 +48,7 @@ export interface TestPoint {
 // 모호한 요구사항 (FR-005)
 export interface AmbiguitySection {
   items: AmbiguityItem[];
+  confidence?: ConfidenceLevel;
 }
 
 export interface AmbiguityItem {
@@ -54,6 +61,7 @@ export interface AmbiguityItem {
 // 누락 가능 요구사항 (FR-006)
 export interface MissingSection {
   items: MissingItem[];
+  confidence?: ConfidenceLevel;
 }
 
 export interface MissingItem {
@@ -65,6 +73,7 @@ export interface MissingItem {
 // QA 질문 (FR-007)
 export interface QAQuestionSection {
   questions: QAQuestion[];
+  confidence?: ConfidenceLevel;
 }
 
 export interface QAQuestion {
@@ -80,6 +89,7 @@ export interface AnalysisMetadata {
   inputLength: number;
   processingTimeMs: number;
   modelUsed: string;
+  failedSections?: string[];
 }
 
 // 스트리밍 이벤트

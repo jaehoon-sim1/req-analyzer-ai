@@ -11,7 +11,7 @@ interface InputSectionProps {
   onAnalyze: () => void;
   onReset: () => void;
   isLoading: boolean;
-  'data-testid'?: string;
+  testId?: string;
 }
 
 export default function InputSection({
@@ -20,14 +20,14 @@ export default function InputSection({
   onAnalyze,
   onReset,
   isLoading,
-  ...props
+  testId,
 }: InputSectionProps) {
   const charCount = value.length;
   const maxChars = 50000;
   const isBelowMin = value.trim().length < MIN_CHARS;
 
   return (
-    <section className="bg-gray-900 rounded-xl p-6 mb-6" data-testid={props['data-testid']}>
+    <section className="bg-gray-900 rounded-xl p-6 mb-6" data-testid={testId}>
       <div className="flex justify-between items-center mb-3">
         <label htmlFor="req-input" className="font-semibold text-sm">요구사항 입력</label>
         <span className="text-xs text-gray-400">

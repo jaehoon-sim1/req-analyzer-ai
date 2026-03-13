@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import type { AnalysisResult } from '@/types/analysis';
+import type { AnalysisResult, ConfidenceLevel } from '@/types/analysis';
+import FeedbackButtons from '@/components/FeedbackButtons';
 
 interface ResultSectionProps {
   result: AnalysisResult;
-  'data-testid'?: string;
+  testId?: string;
 }
 
 const TABS = [
@@ -19,7 +20,24 @@ const TABS = [
 
 type TabKey = typeof TABS[number]['key'];
 
-export default function ResultSection({ result, ...props }: ResultSectionProps) {
+function ConfidenceBadge({ confidence }: { confidence?: ConfidenceLevel }) {
+  if (!confidence) return null;
+  const badge = confidence === 'high' ? '🟢' : confidence === 'medium' ? '🟡' : '🔴';
+  return <span className="ml-1" title={`신뢰도: ${confidence}`}>{badge}</span>;
+}
+
+function getSectionConfidence(result: AnalysisResult, key: TabKey): ConfidenceLevel | undefined {
+  switch (key) {
+    case 'summary': return result.summary.confidence;
+    case 'features': return result.features.confidence;
+    case 'testPoints': return result.testPoints.confidence;
+    case 'ambiguity': return result.ambiguity.confidence;
+    case 'missingRequirements': return result.missingRequirements.confidence;
+    case 'qaQuestions': return result.qaQuestions.confidence;
+  }
+}
+
+export default function ResultSection({ result, testId }: ResultSectionProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
 
   const renderContent = () => {
@@ -36,6 +54,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </li>
               ))}
             </ul>
+            <FeedbackButtons sectionKey="summary" />
           </div>
         );
 
@@ -53,6 +72,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </div>
               ))}
             </div>
+            <FeedbackButtons sectionKey="features" />
           </div>
         );
 
@@ -74,6 +94,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </div>
               ))}
             </div>
+            <FeedbackButtons sectionKey="testPoints" />
           </div>
         );
 
@@ -100,6 +121,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </div>
               ))}
             </div>
+            <FeedbackButtons sectionKey="ambiguity" />
           </div>
         );
 
@@ -115,6 +137,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </div>
               ))}
             </div>
+            <FeedbackButtons sectionKey="missingRequirements" />
           </div>
         );
 
@@ -137,13 +160,14 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
                 </div>
               ))}
             </div>
+            <FeedbackButtons sectionKey="qaQuestions" />
           </div>
         );
     }
   };
 
   return (
-    <section className="bg-gray-900 rounded-xl p-6" data-testid={props['data-testid']}>
+    <section className="bg-gray-900 rounded-xl p-6" data-testid={testId}>
       {/* Metadata */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">분석 결과</h2>
@@ -168,6 +192,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
             onClick={() => setActiveTab(tab.key)}
           >
             {tab.label}
+            <ConfidenceBadge confidence={getSectionConfidence(result, tab.key)} />
           </button>
         ))}
       </div>
