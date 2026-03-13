@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import type { AnalysisResult, ConfidenceLevel } from '@/types/analysis';
-import FeedbackButtons from '@/components/FeedbackButtons';
 
 async function downloadExport(result: AnalysisResult, format: 'excel' | 'json') {
   const response = await fetch('/api/export', {
@@ -91,7 +90,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </li>
               ))}
             </ul>
-            <FeedbackButtons sectionKey="summary" />
           </div>
         );
 
@@ -109,7 +107,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
-            <FeedbackButtons sectionKey="features" />
           </div>
         );
 
@@ -131,7 +128,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
-            <FeedbackButtons sectionKey="testPoints" />
           </div>
         );
 
@@ -158,7 +154,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
-            <FeedbackButtons sectionKey="ambiguity" />
           </div>
         );
 
@@ -174,7 +169,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
-            <FeedbackButtons sectionKey="missingRequirements" />
           </div>
         );
 
@@ -197,7 +191,6 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
-            <FeedbackButtons sectionKey="qaQuestions" />
           </div>
         );
     }

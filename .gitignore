@@ -1,0 +1,23 @@
+# env files
+.env
+.env.local
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# dependencies
+node_modules/
+
+# test artifacts
+test-results/
+playwright-report/
+
+# build
+.next/
+out/
