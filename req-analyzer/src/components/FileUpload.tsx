@@ -276,14 +276,22 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
 
       {/* Sample file download */}
       {uploadState === 'idle' && (
-        <div className="flex items-center gap-2 mt-1">
+        <div className="flex items-center gap-2 mt-1 flex-wrap">
           <span className="text-xs text-gray-500">테스트용:</span>
           <a
             href="/sample-requirements.txt"
             download="sample-requirements.txt"
             className="text-xs text-indigo-400 hover:text-indigo-300 underline transition"
           >
-            샘플 요구사항 파일 다운로드 (.txt)
+            샘플 요구사항 (.txt)
+          </a>
+          <span className="text-xs text-gray-600">|</span>
+          <a
+            href="/sample-signup-wireframe.png"
+            download="sample-signup-wireframe.png"
+            className="text-xs text-indigo-400 hover:text-indigo-300 underline transition"
+          >
+            샘플 화면기획서 (.png)
           </a>
         </div>
       )}
