@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { parsePDF, parseDOCX, parseTXT, parseImage } from '@/lib/parsers';
 
-export const maxDuration = 60;
+export const maxDuration = 300; // OCR 처리 시 충분한 시간 확보 (5분)
 
 // In-memory rate limiter: max 5 requests per minute per IP
 const rateLimitMap = new Map<string, number[]>();

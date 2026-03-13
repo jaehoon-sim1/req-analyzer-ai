@@ -2,11 +2,16 @@ import Tesseract from 'tesseract.js';
 
 /**
  * OCR을 사용하여 이미지(PNG/JPG)에서 텍스트를 추출합니다.
- * tesseract.js를 사용하며, 한국어 + 영어를 기본 지원합니다.
+ * tesseract.js를 사용하며, 영어를 기본 지원합니다.
+ * (한국어 모델은 ~15MB로 서버리스 환경에서 타임아웃 위험이 있어 영어 우선)
  */
 export async function parseImage(buffer: Buffer): Promise<string> {
   try {
-    const { data } = await Tesseract.recognize(buffer, 'kor+eng', {
+    // eng 모델은 ~4MB로 서버리스 환경에서도 안정적
+    // 한국어 포함 시 'kor+eng'로 변경 가능 (로컬 환경 권장)
+    const lang = process.env.OCR_LANGUAGE || 'eng';
+
+    const { data } = await Tesseract.recognize(buffer, lang, {
       logger: () => {}, // suppress progress logs on server
     });
 
