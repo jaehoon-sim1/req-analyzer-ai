@@ -13,6 +13,10 @@ export default function ProgressBar({ progress, message, ...props }: ProgressBar
       </div>
       <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
         <div
+          role="progressbar"
+          aria-valuenow={progress}
+          aria-valuemin={0}
+          aria-valuemax={100}
           className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
           style={{ width: `${progress}%` }}
         />

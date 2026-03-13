@@ -9,7 +9,4 @@ export const SUMMARY_PROMPT = `당신은 소프트웨어 요구사항 분석 전
 3. 각 핵심 포인트는 구체적이고 명확해야 합니다.
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
-{"overview": "전체 요약", "keyPoints": ["포인트1", "포인트2"]}
-
-## 분석할 요구사항
-{input}`;
+{"overview": "전체 요약", "keyPoints": ["포인트1", "포인트2"]}`;
