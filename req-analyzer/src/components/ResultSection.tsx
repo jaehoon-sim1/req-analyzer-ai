@@ -46,7 +46,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
               {result.features.features.map((f) => (
                 <div key={f.id} className="bg-gray-950 rounded-lg p-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">{f.category}</span>
+                    <span className="text-xs bg-indigo-900/50 text-indigo-300 px-2 py-0.5 rounded-full">{f.category || '일반'}</span>
                     <span className="text-sm font-semibold text-gray-200">{f.name}</span>
                   </div>
                   <p className="text-xs text-gray-400">{f.description}</p>
@@ -153,10 +153,12 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 overflow-x-auto pb-2">
+      <div role="tablist" className="flex gap-1 mb-4 overflow-x-auto pb-2">
         {TABS.map((tab) => (
           <button
             key={tab.key}
+            role="tab"
+            aria-selected={activeTab === tab.key}
             data-testid={tab.testId}
             className={`px-3 py-1.5 text-xs rounded-lg whitespace-nowrap transition ${
               activeTab === tab.key
@@ -171,7 +173,7 @@ export default function ResultSection({ result, ...props }: ResultSectionProps) 
       </div>
 
       {/* Content */}
-      <div className="min-h-[200px]">{renderContent()}</div>
+      <div role="tabpanel" className="min-h-[200px]">{renderContent()}</div>
     </section>
   );
 }

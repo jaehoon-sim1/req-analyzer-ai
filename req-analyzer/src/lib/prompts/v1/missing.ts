@@ -9,7 +9,4 @@ export const MISSING_PROMPT = `당신은 소프트웨어 요구사항 완전성 
 3. 카테고리: "에러처리", "보안", "성능", "접근성", "데이터관리", "사용자경험", "운영/모니터링"
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
-{"items": [{"category": "카테고리", "description": "누락 설명", "reason": "필요 근거"}]}
-
-## 분석할 요구사항
-{input}`;
+{"items": [{"category": "카테고리", "description": "누락 설명", "reason": "필요 근거"}]}`;

@@ -16,6 +16,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (text.trim().length < 10) {
+      return Response.json(
+        { error: '요구사항은 최소 10자 이상 입력해 주세요.' },
+        { status: 400 }
+      );
+    }
+
     if (text.length > 50000) {
       return Response.json(
         { error: '입력 텍스트는 50,000자 이내여야 합니다.' },

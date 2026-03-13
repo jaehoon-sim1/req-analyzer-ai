@@ -1,3 +1,4 @@
+import { z } from 'zod';
 import anthropic from './anthropic';
 import type {
   AnalysisResult,
@@ -9,14 +10,16 @@ import type {
   QAQuestionSection,
   StreamEvent,
 } from '@/types/analysis';
+import { SectionSchemas } from '@/types/schemas';
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
-async function callClaude(prompt: string): Promise<string> {
+async function callClaude(systemPrompt: string, userInput: string): Promise<string> {
   const message = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 4096,
-    messages: [{ role: 'user', content: prompt }],
+    system: systemPrompt,
+    messages: [{ role: 'user', content: userInput }],
   });
 
   const textBlock = message.content.find((b) => b.type === 'text');
@@ -28,6 +31,11 @@ function parseJSON<T>(text: string): T {
   const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
   const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
   return JSON.parse(jsonStr);
+}
+
+function parseAndValidate<S extends z.ZodTypeAny>(text: string, schema: S): z.infer<S> {
+  const parsed = parseJSON<unknown>(text);
+  return schema.parse(parsed);
 }
 
 type SectionKey = keyof Omit<AnalysisResult, 'metadata'>;
@@ -64,51 +72,65 @@ export async function analyzeRequirements(
 
   const result: Partial<AnalysisResult> = {};
 
-  for (let i = 0; i < SECTIONS.length; i++) {
-    const section = SECTIONS[i];
-    const progress = Math.round(((i) / SECTIONS.length) * 100);
-
+  // Fire section_start for all sections immediately before parallel execution
+  SECTIONS.forEach((section) => {
     onProgress?.({
       type: 'section_start',
       section: section.key,
-      progress,
+      progress: 0,
       message: `${section.label} 중...`,
     });
+  });
 
-    try {
-      const promptTemplate = (prompts as Record<string, string>)[section.promptImport];
-      const prompt = promptTemplate.replace('{input}', input);
-      const response = await callClaude(prompt);
+  // Track completed count for incremental progress reporting
+  let completedCount = 0;
 
-      switch (section.key) {
-        case 'summary':
-          result.summary = parseJSON<SummarySection>(response);
-          break;
-        case 'features':
-          result.features = parseJSON<FeatureSection>(response);
-          break;
-        case 'testPoints':
-          result.testPoints = parseJSON<TestPointSection>(response);
-          break;
-        case 'ambiguity':
-          result.ambiguity = parseJSON<AmbiguitySection>(response);
-          break;
-        case 'missingRequirements':
-          result.missingRequirements = parseJSON<MissingSection>(response);
-          break;
-        case 'qaQuestions':
-          result.qaQuestions = parseJSON<QAQuestionSection>(response);
-          break;
-      }
+  // Build per-section async tasks
+  const tasks = SECTIONS.map((section) => async () => {
+    const systemPrompt = (prompts as Record<string, string>)[section.promptImport];
+    const response = await callClaude(systemPrompt, input);
 
-      onProgress?.({
-        type: 'section_complete',
-        section: section.key,
-        progress: Math.round(((i + 1) / SECTIONS.length) * 100),
-        message: `${section.label} 완료`,
-        data: result[section.key],
-      });
-    } catch (error) {
+    switch (section.key) {
+      case 'summary':
+        result.summary = parseAndValidate(response, SectionSchemas.summary) as SummarySection;
+        break;
+      case 'features':
+        result.features = parseAndValidate(response, SectionSchemas.features) as FeatureSection;
+        break;
+      case 'testPoints':
+        result.testPoints = parseAndValidate(response, SectionSchemas.testPoints) as TestPointSection;
+        break;
+      case 'ambiguity':
+        result.ambiguity = parseAndValidate(response, SectionSchemas.ambiguity) as AmbiguitySection;
+        break;
+      case 'missingRequirements':
+        result.missingRequirements = parseAndValidate(response, SectionSchemas.missingRequirements) as MissingSection;
+        break;
+      case 'qaQuestions':
+        result.qaQuestions = parseAndValidate(response, SectionSchemas.qaQuestions) as QAQuestionSection;
+        break;
+    }
+
+    completedCount += 1;
+    const progress = Math.round((completedCount / SECTIONS.length) * 100);
+
+    onProgress?.({
+      type: 'section_complete',
+      section: section.key,
+      progress,
+      message: `${section.label} 완료`,
+      data: result[section.key],
+    });
+  });
+
+  // Run all 6 section API calls concurrently
+  const settledResults = await Promise.allSettled(tasks.map((task) => task()));
+
+  // Report errors for any rejected tasks
+  settledResults.forEach((settled, index) => {
+    if (settled.status === 'rejected') {
+      const section = SECTIONS[index];
+      const error = settled.reason;
       console.error(`Failed to analyze section ${section.key}:`, error);
       onProgress?.({
         type: 'error',
@@ -116,7 +138,7 @@ export async function analyzeRequirements(
         message: `${section.label} 실패: ${error instanceof Error ? error.message : 'Unknown error'}`,
       });
     }
-  }
+  });
 
   const processingTimeMs = Date.now() - startTime;
 

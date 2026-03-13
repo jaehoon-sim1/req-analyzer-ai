@@ -35,11 +35,17 @@ export function useAnalysis(): UseAnalysisReturn {
     reset();
     setIsLoading(true);
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, 180_000);
+
     try {
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text }),
+        signal: controller.signal,
       });
 
       if (!response.ok) {
@@ -93,8 +99,13 @@ export function useAnalysis(): UseAnalysisReturn {
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      if (err instanceof Error && err.name === 'AbortError') {
+        setError('분석 시간이 초과되었습니다 (180초). 다시 시도해 주세요.');
+      } else {
+        setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsLoading(false);
     }
   }, [reset]);

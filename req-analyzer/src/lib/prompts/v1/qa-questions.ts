@@ -10,7 +10,4 @@ export const QA_QUESTIONS_PROMPT = `당신은 QA 엔지니어입니다.
 4. 우선순위: "high"(구현 차단), "medium"(설계 영향), "low"(개선)
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
-{"questions": [{"id": 1, "question": "질문", "context": "배경", "priority": "high|medium|low"}]}
-
-## 분석할 요구사항
-{input}`;
+{"questions": [{"id": 1, "question": "질문", "context": "배경", "priority": "high|medium|low"}]}`;
