@@ -4,6 +4,28 @@ import { useState } from 'react';
 import type { AnalysisResult, ConfidenceLevel } from '@/types/analysis';
 import FeedbackButtons from '@/components/FeedbackButtons';
 
+async function downloadExport(result: AnalysisResult, format: 'excel' | 'json') {
+  const response = await fetch('/api/export', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ result, format }),
+  });
+
+  if (!response.ok) {
+    throw new Error('내보내기에 실패했습니다.');
+  }
+
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = format === 'excel' ? 'analysis-result.xlsx' : 'analysis-result.json';
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 interface ResultSectionProps {
   result: AnalysisResult;
   testId?: string;
@@ -39,6 +61,21 @@ function getSectionConfidence(result: AnalysisResult, key: TabKey): ConfidenceLe
 
 export default function ResultSection({ result, testId }: ResultSectionProps) {
   const [activeTab, setActiveTab] = useState<TabKey>('summary');
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportingJson, setExportingJson] = useState(false);
+
+  const handleExport = async (format: 'excel' | 'json') => {
+    if (format === 'excel') setExportingExcel(true);
+    else setExportingJson(true);
+    try {
+      await downloadExport(result, format);
+    } catch {
+      // 내보내기 실패 시 조용히 처리
+    } finally {
+      if (format === 'excel') setExportingExcel(false);
+      else setExportingJson(false);
+    }
+  };
 
   const renderContent = () => {
     switch (activeTab) {
@@ -171,8 +208,28 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
       {/* Metadata */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-semibold">분석 결과</h2>
-        <div className="text-xs text-gray-500">
-          {(result.metadata.processingTimeMs / 1000).toFixed(1)}초 소요 · {result.metadata.inputLength.toLocaleString()}자 분석
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-gray-500">
+            {(result.metadata.processingTimeMs / 1000).toFixed(1)}초 소요 · {result.metadata.inputLength.toLocaleString()}자 분석
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              data-testid="export-excel"
+              onClick={() => handleExport('excel')}
+              disabled={exportingExcel}
+              className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-600 rounded-md text-gray-400 hover:border-indigo-500 hover:text-indigo-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingExcel ? '...' : '📊'} Excel
+            </button>
+            <button
+              data-testid="export-json"
+              onClick={() => handleExport('json')}
+              disabled={exportingJson}
+              className="flex items-center gap-1 px-2 py-1 text-xs border border-gray-600 rounded-md text-gray-400 hover:border-indigo-500 hover:text-indigo-400 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {exportingJson ? '...' : '📋'} JSON
+            </button>
+          </div>
         </div>
       </div>
 
