@@ -10,4 +10,4 @@ export const TEST_POINTS_PROMPT = `당신은 QA 테스트 전문가입니다.
 4. 우선순위: "high", "medium", "low"
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
-{"testPoints": [{"id": 1, "category": "카테고리", "description": "설명", "priority": "high|medium|low"}]}`;
+{"testPoints": [{"id": 1, "category": "카테고리", "description": "설명", "priority": "high|medium|low"}], "confidence": "high" | "medium" | "low"  // 분석 결과에 대한 신뢰도}`;

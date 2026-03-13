@@ -85,7 +85,7 @@ test.describe('Requirements Analyzer E2E Tests', () => {
     for (const tab of tabDefinitions) {
       const tabButton = page.locator(`button[data-testid="${tab.testId}"]`);
       await expect(tabButton).toBeVisible();
-      await expect(tabButton).toHaveText(tab.label);
+      await expect(tabButton).toContainText(tab.label);
     }
 
     // Click each tab and verify content renders

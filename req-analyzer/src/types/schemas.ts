@@ -1,9 +1,12 @@
 import { z } from 'zod';
 
+const confidenceSchema = z.enum(['high', 'medium', 'low']).optional();
+
 // SummarySection schema
 export const SummarySectionSchema = z.object({
   overview: z.string(),
   keyPoints: z.array(z.string()),
+  confidence: confidenceSchema,
 });
 
 // FeatureSection schema
@@ -16,6 +19,7 @@ export const FeatureSchema = z.object({
 
 export const FeatureSectionSchema = z.object({
   features: z.array(FeatureSchema),
+  confidence: confidenceSchema,
 });
 
 // TestPointSection schema
@@ -28,6 +32,7 @@ export const TestPointSchema = z.object({
 
 export const TestPointSectionSchema = z.object({
   testPoints: z.array(TestPointSchema),
+  confidence: confidenceSchema,
 });
 
 // AmbiguitySection schema
@@ -40,6 +45,7 @@ export const AmbiguityItemSchema = z.object({
 
 export const AmbiguitySectionSchema = z.object({
   items: z.array(AmbiguityItemSchema),
+  confidence: confidenceSchema,
 });
 
 // MissingSection schema
@@ -51,6 +57,7 @@ export const MissingItemSchema = z.object({
 
 export const MissingSectionSchema = z.object({
   items: z.array(MissingItemSchema),
+  confidence: confidenceSchema,
 });
 
 // QAQuestionSection schema
@@ -63,6 +70,7 @@ export const QAQuestionSchema = z.object({
 
 export const QAQuestionSectionSchema = z.object({
   questions: z.array(QAQuestionSchema),
+  confidence: confidenceSchema,
 });
 
 // Map of section keys to their schemas

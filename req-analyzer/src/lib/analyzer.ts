@@ -11,6 +11,14 @@ import type {
   StreamEvent,
 } from '@/types/analysis';
 import { SectionSchemas } from '@/types/schemas';
+import {
+  SUMMARY_PROMPT,
+  FEATURES_PROMPT,
+  TEST_POINTS_PROMPT,
+  AMBIGUITY_PROMPT,
+  MISSING_PROMPT,
+  QA_QUESTIONS_PROMPT,
+} from './prompts/v1';
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
@@ -38,21 +46,37 @@ function parseAndValidate<S extends z.ZodTypeAny>(text: string, schema: S): z.in
   return schema.parse(parsed);
 }
 
+async function callClaudeWithRetry(
+  systemPrompt: string,
+  userInput: string,
+  retries = 1
+): Promise<string> {
+  try {
+    return await callClaude(systemPrompt, userInput);
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+      return callClaudeWithRetry(systemPrompt, userInput, retries - 1);
+    }
+    throw err;
+  }
+}
+
 type SectionKey = keyof Omit<AnalysisResult, 'metadata'>;
 
 interface SectionConfig {
   key: SectionKey;
-  promptImport: string;
+  prompt: string;
   label: string;
 }
 
 const SECTIONS: SectionConfig[] = [
-  { key: 'summary', promptImport: 'SUMMARY_PROMPT', label: '요약 생성' },
-  { key: 'features', promptImport: 'FEATURES_PROMPT', label: '기능 목록 추출' },
-  { key: 'testPoints', promptImport: 'TEST_POINTS_PROMPT', label: '테스트 포인트 도출' },
-  { key: 'ambiguity', promptImport: 'AMBIGUITY_PROMPT', label: '모호성 탐지' },
-  { key: 'missingRequirements', promptImport: 'MISSING_PROMPT', label: '누락 요구사항 탐지' },
-  { key: 'qaQuestions', promptImport: 'QA_QUESTIONS_PROMPT', label: 'QA 질문 생성' },
+  { key: 'summary', prompt: SUMMARY_PROMPT, label: '요약 생성' },
+  { key: 'features', prompt: FEATURES_PROMPT, label: '기능 목록 추출' },
+  { key: 'testPoints', prompt: TEST_POINTS_PROMPT, label: '테스트 포인트 도출' },
+  { key: 'ambiguity', prompt: AMBIGUITY_PROMPT, label: '모호성 탐지' },
+  { key: 'missingRequirements', prompt: MISSING_PROMPT, label: '누락 요구사항 탐지' },
+  { key: 'qaQuestions', prompt: QA_QUESTIONS_PROMPT, label: 'QA 질문 생성' },
 ];
 
 export async function analyzeRequirements(
@@ -67,10 +91,8 @@ export async function analyzeRequirements(
     message: '분석을 시작합니다...',
   });
 
-  // Dynamically import prompts
-  const prompts = await import('./prompts/v1');
-
   const result: Partial<AnalysisResult> = {};
+  const failedSections: string[] = [];
 
   // Fire section_start for all sections immediately before parallel execution
   SECTIONS.forEach((section) => {
@@ -87,28 +109,79 @@ export async function analyzeRequirements(
 
   // Build per-section async tasks
   const tasks = SECTIONS.map((section) => async () => {
-    const systemPrompt = (prompts as Record<string, string>)[section.promptImport];
-    const response = await callClaude(systemPrompt, input);
+    let response: string;
+    try {
+      response = await callClaudeWithRetry(section.prompt, input, 1);
+    } catch (err) {
+      // API call failed after retry — fall through to fallback
+      console.error(`Failed to call Claude for section ${section.key}:`, err);
+      failedSections.push(section.key);
+      completedCount += 1;
+      onProgress?.({
+        type: 'error',
+        section: section.key,
+        message: `${section.label} 실패: ${err instanceof Error ? err.message : 'Unknown error'}`,
+      });
+      return;
+    }
 
-    switch (section.key) {
-      case 'summary':
-        result.summary = parseAndValidate(response, SectionSchemas.summary) as SummarySection;
-        break;
-      case 'features':
-        result.features = parseAndValidate(response, SectionSchemas.features) as FeatureSection;
-        break;
-      case 'testPoints':
-        result.testPoints = parseAndValidate(response, SectionSchemas.testPoints) as TestPointSection;
-        break;
-      case 'ambiguity':
-        result.ambiguity = parseAndValidate(response, SectionSchemas.ambiguity) as AmbiguitySection;
-        break;
-      case 'missingRequirements':
-        result.missingRequirements = parseAndValidate(response, SectionSchemas.missingRequirements) as MissingSection;
-        break;
-      case 'qaQuestions':
-        result.qaQuestions = parseAndValidate(response, SectionSchemas.qaQuestions) as QAQuestionSection;
-        break;
+    try {
+      switch (section.key) {
+        case 'summary':
+          result.summary = parseAndValidate(response, SectionSchemas.summary) as SummarySection;
+          break;
+        case 'features':
+          result.features = parseAndValidate(response, SectionSchemas.features) as FeatureSection;
+          break;
+        case 'testPoints':
+          result.testPoints = parseAndValidate(response, SectionSchemas.testPoints) as TestPointSection;
+          break;
+        case 'ambiguity':
+          result.ambiguity = parseAndValidate(response, SectionSchemas.ambiguity) as AmbiguitySection;
+          break;
+        case 'missingRequirements':
+          result.missingRequirements = parseAndValidate(response, SectionSchemas.missingRequirements) as MissingSection;
+          break;
+        case 'qaQuestions':
+          result.qaQuestions = parseAndValidate(response, SectionSchemas.qaQuestions) as QAQuestionSection;
+          break;
+      }
+    } catch (parseErr) {
+      // Parse/validation failed — retry the API call once more
+      console.error(`Parse failed for section ${section.key}, retrying:`, parseErr);
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+        const retryResponse = await callClaude(section.prompt, input);
+        switch (section.key) {
+          case 'summary':
+            result.summary = parseAndValidate(retryResponse, SectionSchemas.summary) as SummarySection;
+            break;
+          case 'features':
+            result.features = parseAndValidate(retryResponse, SectionSchemas.features) as FeatureSection;
+            break;
+          case 'testPoints':
+            result.testPoints = parseAndValidate(retryResponse, SectionSchemas.testPoints) as TestPointSection;
+            break;
+          case 'ambiguity':
+            result.ambiguity = parseAndValidate(retryResponse, SectionSchemas.ambiguity) as AmbiguitySection;
+            break;
+          case 'missingRequirements':
+            result.missingRequirements = parseAndValidate(retryResponse, SectionSchemas.missingRequirements) as MissingSection;
+            break;
+          case 'qaQuestions':
+            result.qaQuestions = parseAndValidate(retryResponse, SectionSchemas.qaQuestions) as QAQuestionSection;
+            break;
+        }
+      } catch (retryErr) {
+        // Both attempts failed — use fallback empty data and track in failedSections
+        console.error(`Retry also failed for section ${section.key}, using fallback:`, retryErr);
+        failedSections.push(section.key);
+        onProgress?.({
+          type: 'error',
+          section: section.key,
+          message: `${section.label} 실패: ${retryErr instanceof Error ? retryErr.message : 'Unknown error'}`,
+        });
+      }
     }
 
     completedCount += 1;
@@ -124,21 +197,7 @@ export async function analyzeRequirements(
   });
 
   // Run all 6 section API calls concurrently
-  const settledResults = await Promise.allSettled(tasks.map((task) => task()));
-
-  // Report errors for any rejected tasks
-  settledResults.forEach((settled, index) => {
-    if (settled.status === 'rejected') {
-      const section = SECTIONS[index];
-      const error = settled.reason;
-      console.error(`Failed to analyze section ${section.key}:`, error);
-      onProgress?.({
-        type: 'error',
-        section: section.key,
-        message: `${section.label} 실패: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      });
-    }
-  });
+  await Promise.allSettled(tasks.map((task) => task()));
 
   const processingTimeMs = Date.now() - startTime;
 
@@ -154,6 +213,7 @@ export async function analyzeRequirements(
       inputLength: input.length,
       processingTimeMs,
       modelUsed: MODEL,
+      ...(failedSections.length > 0 ? { failedSections } : {}),
     },
   };
 
