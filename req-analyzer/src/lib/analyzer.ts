@@ -10,7 +10,7 @@ import type {
   StreamEvent,
 } from '@/types/analysis';
 
-const MODEL = 'claude-sonnet-4-20250514';
+const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
 async function callClaude(prompt: string): Promise<string> {
   const message = await anthropic.messages.create({
