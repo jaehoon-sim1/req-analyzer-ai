@@ -1,0 +1,19 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "tc-generator",
+      "runtimeExecutable": "node.exe",
+      "runtimeArgs": ["node_modules/next/dist/bin/next", "dev", "--turbopack"],
+      "cwd": "tc-generator",
+      "port": 3000
+    }
+    ,
+    {
+      "name": "req-analyzer",
+      "runtimeExecutable": "npx.cmd",
+      "runtimeArgs": ["serve", "-l", "3456", "-s", "."],
+      "port": 3456
+    }
+  ]
+}

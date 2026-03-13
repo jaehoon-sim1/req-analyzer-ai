@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>요구사항 분석 AI</title>
+<style>
+  :root {
+    --primary: #6366f1;
+    --primary-light: #818cf8;
+    --primary-dark: #4f46e5;
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --surface2: #334155;
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --success: #22c55e;
+    --warning: #f59e0b;
+    --danger: #ef4444;
+    --info: #3b82f6;
+    --radius: 12px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.6;
+  }
+
+  .container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  header h1 {
+    font-size: 2rem;
+    background: linear-gradient(135deg, var(--primary-light), #a78bfa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 0.5rem;
+  }
+
+  header p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+  }
+
+  .input-section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .input-section label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 220px;
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    padding: 1rem;
+    color: var(--text);
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus {
+    outline: none;
+    border-color: var(--primary);
+  }
+
+  textarea::placeholder {
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+
+  .btn-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    padding: 0.65rem 1.5rem;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .btn-primary {
+    background: var(--primary);
+    color: white;
+  }
+
+  .btn-primary:hover { background: var(--primary-dark); }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+  }
+
+  .btn-secondary:hover { background: #475569; }
+
+  .btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* Results */
+  .results { display: none; }
+  .results.active { display: block; }
+
+  .score-overview {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .score-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    text-align: center;
+  }
+
+  .score-card .score {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.25rem;
+  }
+
+  .score-card .label {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  .score-high { color: var(--success); }
+  .score-mid { color: var(--warning); }
+  .score-low { color: var(--danger); }
+
+  .analysis-section {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .analysis-section h3 {
+    font-size: 1rem;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 99px;
+    font-size: 0.7rem;
+    font-weight: 600;
+  }
+
+  .badge-danger { background: rgba(239,68,68,0.15); color: var(--danger); }
+  .badge-warning { background: rgba(245,158,11,0.15); color: var(--warning); }
+  .badge-success { background: rgba(34,197,94,0.15); color: var(--success); }
+  .badge-info { background: rgba(59,130,246,0.15); color: var(--info); }
+
+  .issue-list {
+    list-style: none;
+  }
+
+  .issue-item {
+    padding: 0.75rem 1rem;
+    background: var(--bg);
+    border-radius: 8px;
+    margin-bottom: 0.5rem;
+    font-size: 0.88rem;
+    border-left: 3px solid var(--surface2);
+  }
+
+  .issue-item.critical { border-left-color: var(--danger); }
+  .issue-item.warning { border-left-color: var(--warning); }
+  .issue-item.info { border-left-color: var(--info); }
+  .issue-item.good { border-left-color: var(--success); }
+
+  .issue-item strong {
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+
+  .issue-item .context {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+
+  .summary-box {
+    background: var(--surface);
+    border-radius: var(--radius);
+    padding: 1.5rem;
+    margin-bottom: 1rem;
+  }
+
+  .summary-box h3 { margin-bottom: 0.75rem; }
+
+  .summary-box ul {
+    padding-left: 1.25rem;
+  }
+
+  .summary-box li {
+    margin-bottom: 0.4rem;
+    font-size: 0.9rem;
+  }
+
+  .progress-bar {
+    width: 100%;
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-top: 0.5rem;
+  }
+
+  .progress-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.6s ease;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 3rem;
+    display: none;
+  }
+
+  .loading.active { display: block; }
+
+  .spinner {
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--surface2);
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .sample-btns {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    margin-top: 0.75rem;
+  }
+
+  .sample-btn {
+    padding: 0.35rem 0.75rem;
+    background: var(--bg);
+    border: 1px solid var(--surface2);
+    border-radius: 6px;
+    color: var(--text-muted);
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .sample-btn:hover {
+    border-color: var(--primary);
+    color: var(--primary-light);
+  }
+
+  .req-count {
+    float: right;
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 400;
+  }
+
+  @media (max-width: 640px) {
+    .container { padding: 1rem; }
+    header h1 { font-size: 1.5rem; }
+    .score-overview { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Requirements Analysis AI</h1>
+    <p>소프트웨어 요구사항의 품질을 자동으로 분석하고 개선점을 제안합니다</p>
+  </header>
+
+  <div class="input-section">
+    <label>
+      요구사항 입력
+      <span class="req-count" id="reqCount">0개 요구사항 감지</span>
+    </label>
+    <textarea id="reqInput" placeholder="요구사항을 한 줄에 하나씩 입력하세요.
+
+예시:
+1. 사용자는 이메일과 비밀번호로 로그인할 수 있어야 한다.
+2. 시스템은 빠르게 응답해야 한다.
+3. 관리자는 사용자 목록을 조회할 수 있다."></textarea>
+    <div class="sample-btns">
+      <span style="font-size:0.78rem;color:var(--text-muted);line-height:2;">예제:</span>
+      <button class="sample-btn" onclick="loadSample('good')">좋은 요구사항</button>
+      <button class="sample-btn" onclick="loadSample('bad')">개선 필요 요구사항</button>
+      <button class="sample-btn" onclick="loadSample('mixed')">혼합 요구사항</button>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary" id="analyzeBtn" onclick="analyze()">분석 시작</button>
+      <button class="btn btn-secondary" onclick="clearAll()">초기화</button>
+    </div>
+  </div>
+
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p style="color:var(--text-muted);">요구사항을 분석하고 있습니다...</p>
+  </div>
+
+  <div class="results" id="results">
+    <div class="score-overview" id="scoreOverview"></div>
+    <div id="analysisContent"></div>
+  </div>
+</div>
+
+<script>
+const SAMPLES = {
+  good: `1. 사용자는 이메일(RFC 5322 형식)과 8자 이상의 비밀번호를 입력하여 로그인할 수 있어야 한다.
+2. 로그인 실패 시 "이메일 또는 비밀번호가 올바르지 않습니다" 메시지를 표시한다.
+3. 5회 연속 로그인 실패 시 해당 계정을 30분간 잠금 처리한다.
+4. 시스템은 동시 사용자 1,000명 환경에서 페이지 로딩 시간이 2초 이내여야 한다.
+5. 모든 사용자 비밀번호는 bcrypt 알고리즘으로 해싱하여 저장한다.
+6. 관리자는 사용자 목록을 이름, 가입일, 상태 기준으로 정렬하여 조회할 수 있다.`,
+
+  bad: `1. 시스템은 빠르게 동작해야 한다.
+2. UI가 예뻐야 한다.
+3. 보안이 철저해야 한다.
+4. 사용자가 편하게 사용할 수 있어야 한다.
+5. 데이터는 안전하게 관리되어야 한다.
+6. 시스템은 안정적이어야 하고, 사용자 친화적이며, 빠르고, 보안에 강해야 한다.`,
+
+  mixed: `1. 사용자는 이메일과 비밀번호로 회원가입할 수 있어야 한다.
+2. 시스템은 빠르게 응답해야 한다.
+3. 상품 검색 시 결과는 0.5초 이내에 표시되어야 한다.
+4. 보안이 좋아야 한다.
+5. 관리자는 주문 내역을 CSV 파일로 다운로드할 수 있다.
+6. 사용자는 장바구니에 상품을 추가, 수정, 삭제할 수 있어야 한다.
+7. 시스템이 잘 동작해야 한다.
+8. 결제 완료 시 사용자 이메일로 주문 확인 메일이 5분 이내에 발송된다.`
+};
+
+const textarea = document.getElementById('reqInput');
+const reqCount = document.getElementById('reqCount');
+
+textarea.addEventListener('input', updateCount);
+
+function updateCount() {
+  const lines = textarea.value.split('\n').filter(l => l.trim().length > 0);
+  reqCount.textContent = `${lines.length}개 요구사항 감지`;
+}
+
+function loadSample(key) {
+  textarea.value = SAMPLES[key];
+  updateCount();
+}
+
+function clearAll() {
+  textarea.value = '';
+  updateCount();
+  document.getElementById('results').classList.remove('active');
+}
+
+function parseRequirements(text) {
+  return text.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0)
+    .map(l => l.replace(/^\d+[\.\)\-]\s*/, ''));
+}
+
+// ── Analysis Rules ──
+
+const AMBIGUOUS_WORDS = [
+  '빠르게', '빠른', '적절한', '적절히', '좋은', '좋아야', '나쁜',
+  '예쁜', '예뻐야', '편하게', '편리한', '효율적', '안전하게', '안전한',
+  '철저', '잘', '충분히', '높은', '낮은', '적은', '많은',
+  '가능한 한', '최대한', '등', '기타', '다양한', '일부', '대부분',
+  '상당한', '합리적', '쉽게', '간단하게', '직관적', '사용자 친화적',
+  '안정적', '유연한', '확장 가능', '최적화'
+];
+
+const MEASURABLE_PATTERNS = [
+  /\d+\s*(초|ms|밀리초|분|시간|일)/,
+  /\d+\s*(명|개|건|회|%|퍼센트)/,
+  /\d+\s*(MB|GB|KB|byte)/i,
+  /이내|이상|이하|미만|초과/,
+  /\d+\.?\d*\s*(배|배수)/,
+];
+
+const TESTABLE_PATTERNS = [
+  /할 수 있(어야|다|다\.)/,
+  /표시(한다|된다|해야)/,
+  /저장(한다|된다|해야)/,
+  /전송(한다|된다|해야)/,
+  /발송(한다|된다|해야)/,
+  /생성(한다|된다|해야)/,
+  /삭제(한다|된다|해야)/,
+  /조회(한다|된다|해야)/,
+  /다운로드/,
+  /업로드/,
+  /로그인|로그아웃|회원가입/,
+  /입력|출력|반환/,
+];
+
+const SECURITY_KEYWORDS = ['해싱', '암호화', '인증', '권한', '토큰', 'JWT', 'OAuth', 'SSL', 'TLS', 'HTTPS', 'bcrypt', 'RBAC'];
+const PERFORMANCE_KEYWORDS = ['초 이내', '밀리초', 'ms', '응답 시간', '처리량', '동시 사용자', 'TPS', 'QPS'];
+
+function analyzeRequirement(req, index) {
+  const issues = [];
+  const positives = [];
+
+  // 1. Ambiguity check
+  const foundAmbiguous = AMBIGUOUS_WORDS.filter(w => req.includes(w));
+  if (foundAmbiguous.length > 0) {
+    issues.push({
+      type: 'critical',
+      category: '모호성',
+      message: `모호한 표현 발견: "${foundAmbiguous.join('", "')}"`,
+      suggestion: '구체적인 수치나 조건으로 대체하세요.'
+    });
+  }
+
+  // 2. Measurability
+  const isMeasurable = MEASURABLE_PATTERNS.some(p => p.test(req));
+  if (isMeasurable) {
+    positives.push({ category: '측정 가능성', message: '정량적 기준이 포함되어 있습니다.' });
+  }
+
+  // 3. Testability
+  const isTestable = TESTABLE_PATTERNS.some(p => p.test(req));
+  if (isTestable) {
+    positives.push({ category: '테스트 가능성', message: '검증 가능한 행위가 명시되어 있습니다.' });
+  }
+
+  // 4. Too short
+  if (req.length < 15) {
+    issues.push({
+      type: 'warning',
+      category: '불완전성',
+      message: '요구사항이 너무 짧습니다.',
+      suggestion: '주체, 행위, 조건, 결과를 포함하여 구체화하세요.'
+    });
+  }
+
+  // 5. Multiple requirements in one
+  const conjunctions = (req.match(/,\s*(그리고|및|또한|동시에)/g) || []).length;
+  const andCount = (req.match(/(이며|이고|하고|하며)/g) || []).length;
+  if (conjunctions + andCount >= 2) {
+    issues.push({
+      type: 'warning',
+      category: '복합 요구사항',
+      message: '하나의 문장에 여러 요구사항이 포함되어 있습니다.',
+      suggestion: '각 요구사항을 독립된 항목으로 분리하세요.'
+    });
+  }
+
+  // 6. No subject
+  const hasSubject = /^(사용자|관리자|시스템|서버|클라이언트|앱|어플리케이션|서비스|모듈|API|인터페이스|데이터베이스|DB)/.test(req) ||
+    /(사용자|관리자|시스템|서버)는/.test(req);
+  if (!hasSubject && req.length > 10) {
+    issues.push({
+      type: 'info',
+      category: '주체 누락',
+      message: '요구사항의 주체(Actor)가 명시되지 않았습니다.',
+      suggestion: '"사용자는", "시스템은" 등 주체를 명시하세요.'
+    });
+  }
+
+  // 7. No acceptance criteria hint
+  if (!isMeasurable && !isTestable && req.length > 10) {
+    issues.push({
+      type: 'warning',
+      category: '검증 기준 부재',
+      message: '완료 조건이나 검증 기준이 불분명합니다.',
+      suggestion: '수치, 조건, 예상 결과를 명시하여 테스트 가능하게 작성하세요.'
+    });
+  }
+
+  // 8. Security / Performance tags
+  const hasSecurity = SECURITY_KEYWORDS.some(k => req.includes(k));
+  const hasPerformance = PERFORMANCE_KEYWORDS.some(k => req.includes(k));
+  if (hasSecurity) positives.push({ category: '보안', message: '보안 관련 요구사항이 구체적으로 명시되어 있습니다.' });
+  if (hasPerformance) positives.push({ category: '성능', message: '성능 기준이 정량적으로 명시되어 있습니다.' });
+
+  return { text: req, index: index + 1, issues, positives };
+}
+
+function computeScores(results) {
+  const total = results.length;
+  if (total === 0) return { overall: 0, completeness: 0, clarity: 0, testability: 0, consistency: 0 };
+
+  let clarityScore = 0;
+  let testabilityScore = 0;
+  let completenessScore = 0;
+
+  results.forEach(r => {
+    const hasAmbiguity = r.issues.some(i => i.category === '모호성');
+    const hasTestable = r.positives.some(p => p.category === '테스트 가능성');
+    const hasMeasurable = r.positives.some(p => p.category === '측정 가능성');
+    const isShort = r.issues.some(i => i.category === '불완전성');
+    const noSubject = r.issues.some(i => i.category === '주체 누락');
+
+    if (!hasAmbiguity) clarityScore++;
+    if (hasTestable || hasMeasurable) testabilityScore++;
+    if (!isShort && !noSubject) completenessScore++;
+  });
+
+  const clarity = Math.round((clarityScore / total) * 100);
+  const testability = Math.round((testabilityScore / total) * 100);
+  const completeness = Math.round((completenessScore / total) * 100);
+
+  // Check consistency (duplicates / conflicts)
+  const texts = results.map(r => r.text);
+  let consistencyDeductions = 0;
+  for (let i = 0; i < texts.length; i++) {
+    for (let j = i + 1; j < texts.length; j++) {
+      const similarity = computeSimilarity(texts[i], texts[j]);
+      if (similarity > 0.7) consistencyDeductions++;
+    }
+  }
+  const consistency = Math.max(0, Math.round(100 - (consistencyDeductions / total) * 50));
+
+  const overall = Math.round((clarity * 0.3 + testability * 0.3 + completeness * 0.25 + consistency * 0.15));
+
+  return { overall, completeness, clarity, testability, consistency };
+}
+
+function computeSimilarity(a, b) {
+  const setA = new Set(a.split(/\s+/));
+  const setB = new Set(b.split(/\s+/));
+  const intersection = new Set([...setA].filter(x => setB.has(x)));
+  const union = new Set([...setA, ...setB]);
+  return intersection.size / union.size;
+}
+
+function getScoreClass(score) {
+  if (score >= 70) return 'score-high';
+  if (score >= 40) return 'score-mid';
+  return 'score-low';
+}
+
+function getScoreLabel(score) {
+  if (score >= 80) return '우수';
+  if (score >= 60) return '양호';
+  if (score >= 40) return '보통';
+  return '개선 필요';
+}
+
+function analyze() {
+  const text = textarea.value.trim();
+  if (!text) { alert('요구사항을 입력해 주세요.'); return; }
+
+  const reqs = parseRequirements(text);
+  if (reqs.length === 0) { alert('분석할 요구사항이 없습니다.'); return; }
+
+  const loading = document.getElementById('loading');
+  const resultsDiv = document.getElementById('results');
+  resultsDiv.classList.remove('active');
+  loading.classList.add('active');
+
+  setTimeout(() => {
+    const results = reqs.map((r, i) => analyzeRequirement(r, i));
+    const scores = computeScores(results);
+
+    renderScores(scores);
+    renderAnalysis(results, scores);
+
+    loading.classList.remove('active');
+    resultsDiv.classList.add('active');
+    resultsDiv.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 800);
+}
+
+function renderScores(scores) {
+  const container = document.getElementById('scoreOverview');
+  const items = [
+    { label: '종합 점수', value: scores.overall },
+    { label: '명확성', value: scores.clarity },
+    { label: '테스트 가능성', value: scores.testability },
+    { label: '완전성', value: scores.completeness },
+    { label: '일관성', value: scores.consistency },
+  ];
+
+  container.innerHTML = items.map(item => `
+    <div class="score-card">
+      <div class="score ${getScoreClass(item.value)}">${item.value}</div>
+      <div class="label">${item.label}</div>
+      <div class="progress-bar">
+        <div class="progress-fill ${getScoreClass(item.value)}" style="width:${item.value}%;background:currentColor;"></div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderAnalysis(results, scores) {
+  const container = document.getElementById('analysisContent');
+  let html = '';
+
+  // Summary
+  const totalIssues = results.reduce((s, r) => s + r.issues.length, 0);
+  const criticalCount = results.reduce((s, r) => s + r.issues.filter(i => i.type === 'critical').length, 0);
+  const warningCount = results.reduce((s, r) => s + r.issues.filter(i => i.type === 'warning').length, 0);
+  const goodCount = results.filter(r => r.issues.length === 0).length;
+
+  html += `<div class="summary-box">
+    <h3>분석 요약</h3>
+    <ul>
+      <li>총 <strong>${results.length}개</strong> 요구사항 분석 완료</li>
+      <li>발견된 이슈: <span class="badge badge-danger">${criticalCount} 심각</span> <span class="badge badge-warning">${warningCount} 경고</span></li>
+      <li>이슈 없는 요구사항: <span class="badge badge-success">${goodCount}개</span></li>
+      <li>종합 평가: <strong>${getScoreLabel(scores.overall)}</strong> (${scores.overall}점)</li>
+    </ul>
+  </div>`;
+
+  // Per-requirement detail
+  html += `<div class="analysis-section">
+    <h3>상세 분석 결과</h3>
+    <ul class="issue-list">`;
+
+  results.forEach(r => {
+    if (r.issues.length === 0) {
+      html += `<li class="issue-item good">
+        <strong>#${r.index} ✓ 양호</strong>
+        <div class="context">${escapeHtml(r.text)}</div>
+        ${r.positives.map(p => `<div style="color:var(--success);font-size:0.82rem;margin-top:0.25rem;">+ ${p.message}</div>`).join('')}
+      </li>`;
+    } else {
+      const severity = r.issues.some(i => i.type === 'critical') ? 'critical' : 'warning';
+      html += `<li class="issue-item ${severity}">
+        <strong>#${r.index} ${r.issues.length}개 이슈 발견</strong>
+        <div class="context">${escapeHtml(r.text)}</div>
+        ${r.issues.map(i => `
+          <div style="margin-top:0.4rem;">
+            <span class="badge badge-${i.type === 'critical' ? 'danger' : i.type === 'warning' ? 'warning' : 'info'}">${i.category}</span>
+            <span style="font-size:0.82rem;margin-left:0.25rem;">${i.message}</span>
+            <div style="color:var(--primary-light);font-size:0.8rem;margin-top:0.15rem;">→ ${i.suggestion}</div>
+          </div>
+        `).join('')}
+        ${r.positives.length > 0 ? r.positives.map(p => `<div style="color:var(--success);font-size:0.82rem;margin-top:0.25rem;">+ ${p.message}</div>`).join('') : ''}
+      </li>`;
+    }
+  });
+
+  html += `</ul></div>`;
+
+  // Improvement suggestions
+  html += `<div class="summary-box">
+    <h3>개선 권장사항</h3>
+    <ul>`;
+
+  if (scores.clarity < 70) html += `<li>모호한 표현("빠르게", "적절한" 등)을 구체적 수치로 대체하세요.</li>`;
+  if (scores.testability < 70) html += `<li>각 요구사항에 검증 가능한 완료 조건을 추가하세요.</li>`;
+  if (scores.completeness < 70) html += `<li>요구사항의 주체(사용자/시스템)와 상세 조건을 명시하세요.</li>`;
+  if (scores.consistency < 80) html += `<li>중복되거나 유사한 요구사항을 통합하거나 구분하세요.</li>`;
+
+  const hasSecurity = results.some(r => r.positives.some(p => p.category === '보안'));
+  const hasPerformance = results.some(r => r.positives.some(p => p.category === '성능'));
+  if (!hasSecurity) html += `<li>보안 관련 요구사항(인증, 암호화, 권한 등)을 추가하는 것을 고려하세요.</li>`;
+  if (!hasPerformance) html += `<li>성능 관련 요구사항(응답 시간, 처리량 등)을 추가하는 것을 고려하세요.</li>`;
+
+  if (scores.overall >= 80) html += `<li>전반적으로 잘 작성된 요구사항입니다. 세부 이슈만 보완하면 됩니다.</li>`;
+
+  html += `</ul></div>`;
+
+  container.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 -c \":*)",
+      "Bash(python -c \":*)",
+      "Bash(python create_login_tc.py)",
+      "Bash(npx create-next-app@latest tc-generator --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --use-npm --turbopack)",
+      "Bash(npx create-next-app@latest tc-generator --typescript --tailwind --eslint --app --src-dir=false --import-alias=\"@/*\" --use-npm --turbopack --no-react-compiler)",
+      "Bash(mkdir -p tc-generator)",
+      "Bash(cp tc-generator-pkg.json tc-generator/package.json)",
+      "Bash(rm tc-generator-pkg.json)",
+      "Bash(npm install)",
+      "Bash(npx next build)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(where npm.cmd)",
+      "Bash(where npx.cmd)",
+      "Bash(where node.exe)",
+      "Bash(npm install @google/generative-ai)",
+      "Bash(ollama --version)",
+      "Bash(where ollama)",
+      "Read(//c/Users/wogns1028/AppData/Local/Programs/Ollama/**)",
+      "Read(//c/Program Files/Ollama/**)",
+      "Bash(where vercel)",
+      "Bash(npx vercel --version)",
+      "Bash(npx vercel whoami)",
+      "Bash(npx vercel login)",
+      "Bash(gh auth status)",
+      "Bash(where git)",
+      "Bash(git --version)",
+      "Bash(npm run build)",
+      "WebSearch",
+      "WebFetch(domain:openrouter.ai)",
+      "Bash(where npx:*)"
+    ]
+  }
+}
