@@ -1,3 +1,20 @@
+# CI Pipeline — 요구사항 분석 AI
+#
+# 7-Job 자동화 파이프라인:
+#   1. lint-and-typecheck  — TypeScript 타입체크 + ESLint (필수)
+#   2. security-audit      — npm audit + 하드코딩 시크릿 탐지 + .env 추적 방지 (필수)
+#   3. build               — Next.js 프로덕션 빌드 + 번들 사이즈 리포트 (필수)
+#   4. unit-test           — Vitest 77 TCs + V8 커버리지 리포트 (필수)
+#   5. performance-test    — 페이지/API 응답시간 측정 + Lighthouse CI 감사 (Advisory)
+#   6. e2e-test            — Playwright 12 TCs, AC-001~AC-008 전체 커버 (조건부)
+#   7. regression-gate     — 전체 Job 결과 집계 → 최종 통과/실패 판정 (필수)
+#
+# 파이프라인 흐름:
+#   lint-and-typecheck ──┬── build ──┬── performance-test ──┐
+#                        │           └── e2e-test            ├── regression-gate
+#                        └── unit-test ─────────────────────┘
+#   security-audit ─────────────────────────────────────────┘
+
 name: CI Pipeline
 
 on:

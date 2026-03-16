@@ -1,6 +1,25 @@
+/**
+ * E2E 테스트 — 요구사항 분석 AI (Playwright)
+ *
+ * 총 12개 테스트 케이스 (TC-E2E-001 ~ TC-E2E-012)
+ * Acceptance Criteria 커버리지: AC-001 ~ AC-008 전체
+ *
+ * TC-E2E-001: 페이지 로드 + 제목 표시
+ * TC-E2E-002: 샘플 버튼 → 데이터 로드 + 글자수 217자
+ * TC-E2E-003: 초기화 버튼 → 입력 클리어
+ * TC-E2E-004: 빈 입력 시 분석 버튼 비활성화
+ * TC-E2E-005: 전체 분석 흐름 — 6개 탭 전환 + 콘텐츠 확인 (AC-001, AC-002, AC-003)
+ * TC-E2E-006: 에러 처리 — 공백/짧은 입력 (AC-008)
+ * TC-E2E-007: 누락 요구사항 탐지 — 탭 콘텐츠 + 항목 렌더링 (AC-004)
+ * TC-E2E-008: 파일 업로드 — TXT 파일 → textarea 로드 (AC-005)
+ * TC-E2E-009: JSON 내보내기 — 다운로드 이벤트 + 파일명 검증 (AC-006)
+ * TC-E2E-010: 파일 업로드 모드 토글 UI
+ * TC-E2E-011: 분석 후 내보내기 버튼(Excel/JSON) 표시
+ * TC-E2E-012: 접근성 ARIA 속성 검증 — lang, tablist, role, aria-selected (AC-007)
+ */
 import { test, expect } from '@playwright/test';
 
-test.describe('Requirements Analyzer E2E Tests', () => {
+test.describe('Requirements Analyzer E2E Tests — 12 TCs (AC-001~AC-008)', () => {
 
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
