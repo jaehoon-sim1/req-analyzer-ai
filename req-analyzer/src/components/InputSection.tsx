@@ -58,8 +58,10 @@ export default function InputSection({
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-1 mb-4 p-1 bg-gray-800 rounded-lg w-fit">
+      <div role="tablist" aria-label="입력 방식 선택" className="flex gap-1 mb-4 p-1 bg-gray-800 rounded-lg w-fit">
         <button
+          role="tab"
+          aria-selected={inputMode === 'text'}
           data-testid="input-mode-text"
           className={`px-4 py-1.5 text-xs font-semibold rounded-md transition ${
             inputMode === 'text'
@@ -71,6 +73,8 @@ export default function InputSection({
           텍스트 입력
         </button>
         <button
+          role="tab"
+          aria-selected={inputMode === 'file'}
           data-testid="input-mode-file"
           className={`px-4 py-1.5 text-xs font-semibold rounded-md transition ${
             inputMode === 'file'
@@ -85,15 +89,20 @@ export default function InputSection({
 
       {/* Input area */}
       {inputMode === 'text' ? (
-        <textarea
-          id="req-input"
-          data-testid="req-input"
-          className="w-full h-56 bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-y"
-          placeholder="요구사항을 한 줄에 하나씩 입력하세요.&#10;&#10;예시:&#10;1. 사용자는 이메일과 비밀번호로 로그인할 수 있어야 한다.&#10;2. 시스템은 빠르게 응답해야 한다."
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          maxLength={maxChars}
-        />
+        <>
+          <textarea
+            id="req-input"
+            data-testid="req-input"
+            aria-label="요구사항 텍스트 입력"
+            aria-describedby="req-input-hint"
+            className="w-full h-56 bg-gray-950 border border-gray-800 rounded-lg p-4 text-sm text-gray-100 placeholder-gray-600 focus:outline-none focus:border-indigo-500 resize-y"
+            placeholder="요구사항을 한 줄에 하나씩 입력하세요.&#10;&#10;예시:&#10;1. 사용자는 이메일과 비밀번호로 로그인할 수 있어야 한다.&#10;2. 시스템은 빠르게 응답해야 한다."
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            maxLength={maxChars}
+          />
+          <span id="req-input-hint" className="sr-only">최소 10자 이상 입력해야 분석을 시작할 수 있습니다</span>
+        </>
       ) : (
         <FileUpload onTextExtracted={handleTextExtracted} />
       )}
@@ -118,6 +127,7 @@ export default function InputSection({
       <div className="flex gap-3 mt-4">
         <button
           data-testid="analyze-btn"
+          aria-label={isLoading ? '분석 진행 중' : '요구사항 분석 시작'}
           className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition"
           onClick={onAnalyze}
           disabled={isLoading || isBelowMin}
@@ -125,6 +135,7 @@ export default function InputSection({
           {isLoading ? '분석 중...' : '분석 시작'}
         </button>
         <button
+          aria-label="입력 내용 초기화"
           className="px-6 py-2.5 bg-gray-800 hover:bg-gray-700 rounded-lg text-sm font-semibold transition"
           onClick={handleReset}
         >

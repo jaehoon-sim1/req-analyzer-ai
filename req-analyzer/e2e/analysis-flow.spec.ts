@@ -137,4 +137,145 @@ test.describe('Requirements Analyzer E2E Tests', () => {
     // If we got a result instead of error, that's also acceptable (API handled short input)
   });
 
+  // TC-E2E-007: AC-004 — Missing requirements detection produces results
+  test('TC-E2E-007: AC-004 missing requirements are detected', async ({ page }) => {
+    test.setTimeout(180000);
+
+    // Login sample has known missing items (session management, MFA, audit log, etc.)
+    await page.getByRole('button', { name: '로그인 시스템' }).click();
+    await page.locator('[data-testid="analyze-btn"]').click();
+
+    await expect(page.locator('[data-testid="result-summary"]')).toBeVisible({ timeout: 180000 });
+
+    // Navigate to "누락 요구사항" tab
+    const missingTab = page.locator('button[data-testid="section-missing"]');
+    await expect(missingTab).toBeVisible();
+    await missingTab.click();
+
+    // Verify the missing section has actual content (not empty fallback)
+    const missingContent = page.locator('div[data-testid="section-missing"]');
+    await expect(missingContent).toBeVisible({ timeout: 5000 });
+    const text = await missingContent.innerText();
+    expect(text.trim().length).toBeGreaterThan(0);
+
+    // There should be at least one detected missing item rendered
+    const missingItems = missingContent.locator('.bg-gray-950');
+    const count = await missingItems.count();
+    expect(count).toBeGreaterThanOrEqual(1);
+  });
+
+  // TC-E2E-008: AC-005 — File upload parses TXT and loads text for analysis
+  test('TC-E2E-008: AC-005 file upload parses and loads text', async ({ page }) => {
+    test.setTimeout(180000);
+
+    // Switch to file upload mode
+    await page.locator('[data-testid="input-mode-file"]').click();
+    const uploadArea = page.locator('[data-testid="file-upload"]');
+    await expect(uploadArea).toBeVisible();
+
+    // Upload the sample TXT file via the hidden file input
+    const fileInput = page.locator('[data-testid="file-upload-input"]');
+    await fileInput.setInputFiles('public/sample-requirements.txt');
+
+    // After successful upload, FileUpload calls onTextExtracted → switches to text mode
+    const textarea = page.locator('[data-testid="req-input"]');
+    await expect(textarea).toBeVisible({ timeout: 30000 });
+    const value = await textarea.inputValue();
+    expect(value.length).toBeGreaterThan(10);
+
+    // The analyze button should now be enabled
+    await expect(page.locator('[data-testid="analyze-btn"]')).toBeEnabled();
+  });
+
+  // TC-E2E-009: AC-006 — Export JSON produces downloadable file
+  test('TC-E2E-009: AC-006 export JSON download works', async ({ page }) => {
+    test.setTimeout(180000);
+
+    // Run analysis first
+    await page.getByRole('button', { name: '로그인 시스템' }).click();
+    await page.locator('[data-testid="analyze-btn"]').click();
+    await expect(page.locator('[data-testid="result-summary"]')).toBeVisible({ timeout: 180000 });
+
+    // Click JSON export and wait for download event
+    const downloadPromise = page.waitForEvent('download', { timeout: 30000 });
+    await page.locator('[data-testid="export-json"]').click();
+    const download = await downloadPromise;
+
+    // Verify filename
+    expect(download.suggestedFilename()).toBe('analysis-result.json');
+  });
+
+  // TC-E2E-010: File upload mode toggle UI
+  test('TC-E2E-010: file upload mode toggle', async ({ page }) => {
+    const textModeBtn = page.locator('[data-testid="input-mode-text"]');
+    const fileModeBtn = page.locator('[data-testid="input-mode-file"]');
+
+    await expect(textModeBtn).toHaveAttribute('aria-selected', 'true');
+    await expect(fileModeBtn).toHaveAttribute('aria-selected', 'false');
+
+    await fileModeBtn.click();
+    await expect(fileModeBtn).toHaveAttribute('aria-selected', 'true');
+    await expect(textModeBtn).toHaveAttribute('aria-selected', 'false');
+
+    const uploadArea = page.locator('[data-testid="file-upload"]');
+    await expect(uploadArea).toBeVisible();
+
+    await textModeBtn.click();
+    await expect(textModeBtn).toHaveAttribute('aria-selected', 'true');
+    const textarea = page.locator('[data-testid="req-input"]');
+    await expect(textarea).toBeVisible();
+  });
+
+  // TC-E2E-011: Export buttons appear after analysis
+  test('TC-E2E-011: export buttons appear after analysis', async ({ page }) => {
+    test.setTimeout(180000);
+
+    await page.getByRole('button', { name: '로그인 시스템' }).click();
+    await page.locator('[data-testid="analyze-btn"]').click();
+    await expect(page.locator('[data-testid="result-summary"]')).toBeVisible({ timeout: 180000 });
+
+    const excelBtn = page.locator('[data-testid="export-excel"]');
+    const jsonBtn = page.locator('[data-testid="export-json"]');
+
+    await expect(excelBtn).toBeVisible();
+    await expect(jsonBtn).toBeVisible();
+    await expect(excelBtn).toContainText('Excel');
+    await expect(jsonBtn).toContainText('JSON');
+  });
+
+  // TC-E2E-012: Accessibility — ARIA attributes verification
+  test('TC-E2E-012: accessibility attributes are present', async ({ page }) => {
+    const htmlLang = await page.locator('html').getAttribute('lang');
+    expect(htmlLang).toBe('ko');
+
+    const textarea = page.locator('[data-testid="req-input"]');
+    await expect(textarea).toHaveAttribute('aria-label');
+
+    const tablist = page.locator('[role="tablist"]').first();
+    await expect(tablist).toBeVisible();
+
+    const textTab = page.locator('[data-testid="input-mode-text"]');
+    await expect(textTab).toHaveAttribute('role', 'tab');
+    await expect(textTab).toHaveAttribute('aria-selected', 'true');
+
+    const analyzeBtn = page.locator('[data-testid="analyze-btn"]');
+    await expect(analyzeBtn).toHaveAttribute('aria-label');
+
+    // Trigger analysis to verify result section accessibility
+    await page.getByRole('button', { name: '로그인 시스템' }).click();
+    await page.locator('[data-testid="analyze-btn"]').click();
+
+    const resultSection = page.locator('[data-testid="result-summary"]');
+    await expect(resultSection).toBeVisible({ timeout: 180000 });
+
+    const resultTablist = resultSection.locator('[role="tablist"]');
+    await expect(resultTablist).toBeVisible();
+
+    const resultTabs = resultSection.locator('[role="tab"]');
+    expect(await resultTabs.count()).toBe(6);
+
+    const tabpanel = resultSection.locator('[role="tabpanel"]');
+    await expect(tabpanel).toBeVisible();
+  });
+
 });
