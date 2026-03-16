@@ -140,6 +140,22 @@ AI는 분석 결과를 아래 구조로 제공한다.
 | 4 | 모호한 요구사항 | FR-005 | ✅ 완료 |
 | 5 | 누락 가능 요구사항 | FR-006 | ✅ 완료 |
 | 6 | QA 질문 리스트 | FR-007 | ✅ 완료 |
+| 7 | 파일 업로드 + OCR | FR-008 | ✅ 완료 |
+| 8 | Excel/JSON 내보내기 | FR-009 | ✅ 완료 |
+
+### 6-1. 기능별 구현 파일 매핑
+
+| FR | 기능 | Backend (API Route) | Frontend (Component) | Core Logic |
+|----|------|---------------------|----------------------|------------|
+| FR-001 | 분석 엔진 | `src/app/api/analyze/route.ts` | — | `src/lib/analyzer.ts` |
+| FR-002 | 요약 생성 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/summary.ts` |
+| FR-003 | 기능 목록 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/features.ts` |
+| FR-004 | 테스트 포인트 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/test-points.ts` |
+| FR-005 | 모호성 탐지 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/ambiguity.ts` |
+| FR-006 | 누락 탐지 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/missing.ts` |
+| FR-007 | QA 질문 | (analyze 내부) | `src/components/ResultSection.tsx` | `src/lib/prompts/v1/qa-questions.ts` |
+| FR-008 | 파일 업로드 | `src/app/api/upload/route.ts` | `src/components/FileUpload.tsx` | `src/lib/parsers/{pdf,docx,txt,image}-parser.ts` |
+| FR-009 | 내보내기 | `src/app/api/export/route.ts` | `src/components/ResultSection.tsx` | `src/lib/export/excel.ts` |
 
 ---
 
