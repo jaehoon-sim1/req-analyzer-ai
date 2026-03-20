@@ -25,7 +25,7 @@ const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 async function callClaude(systemPrompt: string, userInput: string): Promise<string> {
   const message = await anthropic.messages.create({
     model: MODEL,
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: systemPrompt,
     messages: [{ role: 'user', content: userInput }],
   });
