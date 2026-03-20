@@ -17,6 +17,7 @@ const ACCEPTED_TYPES = [
 ];
 const ACCEPTED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.png', '.jpg', '.jpeg'];
 const MAX_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const SERVER_UPLOAD_LIMIT = 4.5 * 1024 * 1024; // 4.5MB (Vercel serverless 제한)
 
 function formatFileSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -24,14 +25,47 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getFileExtension(filename: string): string {
+  return '.' + filename.split('.').pop()?.toLowerCase();
+}
+
+/** 4.5MB 초과 PDF를 브라우저에서 직접 텍스트 추출 */
+async function extractPdfTextClientSide(file: File): Promise<string> {
+  const pdfjsLib = await import('pdfjs-dist');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`;
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+
+  const pages: string[] = [];
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const text = content.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ');
+    pages.push(text);
+  }
+  return pages.join('\n\n');
+}
+
+/** 4.5MB 초과 TXT를 브라우저에서 직접 읽기 */
+async function readTxtClientSide(file: File): Promise<string> {
+  return file.text();
+}
+
 function isValidFile(file: File): { valid: boolean; error?: string } {
-  const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+  const ext = getFileExtension(file.name);
   const typeOk = ACCEPTED_TYPES.includes(file.type) || ACCEPTED_EXTENSIONS.includes(ext);
   if (!typeOk) {
     return { valid: false, error: '지원하지 않는 파일 형식입니다. PDF, DOCX, TXT, PNG, JPG 파일만 업로드할 수 있습니다.' };
   }
   if (file.size > MAX_SIZE_BYTES) {
     return { valid: false, error: `파일 크기가 너무 큽니다. 최대 10MB까지 업로드할 수 있습니다. (현재: ${formatFileSize(file.size)})` };
+  }
+  // 4.5MB 초과인데 클라이언트 추출이 불가능한 파일 타입
+  if (file.size > SERVER_UPLOAD_LIMIT && !['.pdf', '.txt'].includes(ext)) {
+    return { valid: false, error: `DOCX/이미지 파일은 4.5MB 이하만 업로드할 수 있습니다. (현재: ${formatFileSize(file.size)})` };
   }
   return { valid: true };
 }
@@ -41,6 +75,7 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
+  const [infoMessage, setInfoMessage] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   function handleDragOver(e: DragEvent<HTMLDivElement>) {
@@ -80,13 +115,51 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
       setUploadState('error');
       setSelectedFile(null);
       setErrorMessage(validation.error ?? '파일 업로드에 실패했습니다.');
+      setInfoMessage('');
       return;
     }
     setSelectedFile(file);
     setErrorMessage('');
-    uploadFile(file);
+    setInfoMessage('');
+
+    const ext = getFileExtension(file.name);
+    if (file.size > SERVER_UPLOAD_LIMIT && ['.pdf', '.txt'].includes(ext)) {
+      extractClientSide(file, ext);
+    } else {
+      uploadFile(file);
+    }
   }
 
+  /** 4.5MB 초과 PDF/TXT: 브라우저에서 텍스트 추출 후 직접 전달 */
+  async function extractClientSide(file: File, ext: string) {
+    setUploadState('uploading');
+    setProgress(0);
+    setInfoMessage(`파일 크기(${formatFileSize(file.size)})가 서버 업로드 제한(4.5MB)을 초과하여, 브라우저에서 텍스트를 직접 추출합니다.`);
+
+    try {
+      setProgress(20);
+      let text: string;
+      if (ext === '.pdf') {
+        text = await extractPdfTextClientSide(file);
+      } else {
+        text = await readTxtClientSide(file);
+      }
+      setProgress(100);
+      setUploadState('success');
+      onTextExtracted(text);
+    } catch (err) {
+      setProgress(0);
+      setUploadState('error');
+      setInfoMessage('');
+      setErrorMessage(
+        err instanceof Error
+          ? `클라이언트 텍스트 추출 실패: ${err.message}`
+          : '파일에서 텍스트를 추출하지 못했습니다.'
+      );
+    }
+  }
+
+  /** 4.5MB 이하: 서버로 파일 업로드 */
   async function uploadFile(file: File) {
     setUploadState('uploading');
     setProgress(0);
@@ -95,7 +168,6 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
     formData.append('file', file);
 
     try {
-      // Simulate progress while waiting for the response
       const progressInterval = setInterval(() => {
         setProgress((prev) => {
           if (prev >= 85) {
@@ -140,6 +212,7 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
     setSelectedFile(null);
     setProgress(0);
     setErrorMessage('');
+    setInfoMessage('');
   }
 
   // Border/background classes depending on state
@@ -232,7 +305,9 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
         {/* Success state */}
         {uploadState === 'success' && selectedFile && (
           <div className="flex flex-col items-center gap-1" onClick={(e) => e.stopPropagation()}>
-            <p className="text-sm font-semibold text-green-400">업로드 완료</p>
+            <p className="text-sm font-semibold text-green-400">
+              {infoMessage ? '텍스트 추출 완료' : '업로드 완료'}
+            </p>
             <p className="text-xs text-gray-400 truncate max-w-xs">{selectedFile.name}</p>
             <p className="text-xs text-gray-500">{formatFileSize(selectedFile.size)}</p>
           </div>
@@ -246,6 +321,14 @@ export default function FileUpload({ onTextExtracted }: FileUploadProps) {
           </div>
         )}
       </div>
+
+      {/* Info message for client-side extraction */}
+      {infoMessage && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-900/30 border border-amber-700/50 rounded-lg text-xs text-amber-300">
+          <span>ℹ️</span>
+          <span>{infoMessage}</span>
+        </div>
+      )}
 
       {/* File info bar (after selection, before/after upload) */}
       {selectedFile && uploadState !== 'uploading' && (
