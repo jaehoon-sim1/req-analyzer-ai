@@ -35,10 +35,21 @@ async function callClaude(systemPrompt: string, userInput: string): Promise<stri
 }
 
 function parseJSON<T>(text: string): T {
-  // Extract JSON from markdown code blocks if present
-  const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/);
-  const jsonStr = jsonMatch ? jsonMatch[1].trim() : text.trim();
-  return JSON.parse(jsonStr);
+  let str = text.trim();
+
+  // Remove markdown code fences (```json ... ``` or ``` ... ```)
+  str = str.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '');
+
+  // If still not starting with { or [, try to extract JSON object/array
+  str = str.trim();
+  if (!str.startsWith('{') && !str.startsWith('[')) {
+    const match = str.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    if (match) {
+      str = match[1];
+    }
+  }
+
+  return JSON.parse(str);
 }
 
 function parseAndValidate<S extends z.ZodTypeAny>(text: string, schema: S): z.infer<S> {
