@@ -21,8 +21,8 @@ function isRateLimited(ip: string): boolean {
   return false;
 }
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.png', '.jpg', '.jpeg'];
+const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.html', '.htm', '.png', '.jpg', '.jpeg'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_FILE_SIZE) {
       return Response.json(
-        { error: '파일 크기는 10MB를 초과할 수 없습니다.' },
+        { error: '파일 크기는 500MB를 초과할 수 없습니다.' },
         { status: 400 }
       );
     }
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return Response.json(
-        { error: 'PDF, DOCX, TXT, PNG, JPG 파일만 업로드할 수 있습니다.' },
+        { error: 'PDF, DOCX, TXT, HTML, PNG, JPG 파일만 업로드할 수 있습니다.' },
         { status: 400 }
       );
     }
@@ -76,6 +76,10 @@ export async function POST(request: NextRequest) {
       text = await parseDOCX(buffer);
     } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
       text = await parseImage(buffer);
+    } else if (ext === '.html' || ext === '.htm') {
+      // HTML: 태그 제거 후 텍스트만 추출
+      const raw = buffer.toString('utf-8');
+      text = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
     } else {
       text = await parseTXT(buffer);
     }
