@@ -77,9 +77,20 @@ export async function POST(request: NextRequest) {
     } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
       text = await parseImage(buffer);
     } else if (ext === '.html' || ext === '.htm') {
-      // HTML: 태그 제거 후 텍스트만 추출
+      // HTML: style/script 블록 제거 후 태그 제거, 텍스트만 추출
       const raw = buffer.toString('utf-8');
-      text = raw.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      text = raw
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]*>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .replace(/\s+/g, ' ')
+        .trim();
     } else {
       text = await parseTXT(buffer);
     }
