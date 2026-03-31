@@ -29,12 +29,20 @@ export default function InputSection({
   const [inputMode, setInputMode] = useState<InputMode>('text');
 
   const charCount = value.length;
-  const maxChars = 50000;
+  const maxChars = inputMode === 'figma' ? 100000 : 50000;
   const isBelowMin = value.trim().length < MIN_CHARS;
 
   function handleTextExtracted(text: string) {
     onChange(text);
-    setInputMode('text');
+    if (inputMode !== 'figma') {
+      setInputMode('text');
+    }
+  }
+
+  function handleFigmaAutoAnalyze() {
+    if (value.trim().length >= MIN_CHARS) {
+      onAnalyze();
+    }
   }
 
   function handleModeChange(mode: InputMode) {
@@ -120,7 +128,7 @@ export default function InputSection({
       ) : inputMode === 'file' ? (
         <FileUpload onTextExtracted={handleTextExtracted} />
       ) : (
-        <FigmaImport onTextExtracted={handleTextExtracted} />
+        <FigmaImport onTextExtracted={handleTextExtracted} onAutoAnalyze={handleFigmaAutoAnalyze} />
       )}
 
       {/* Sample buttons — only shown in text mode */}

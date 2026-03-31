@@ -53,9 +53,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (text.length > 50000) {
+    if (text.length > 100000) {
       return Response.json(
-        { error: '입력 텍스트는 50,000자 이내여야 합니다.' },
+        { error: '입력 텍스트는 100,000자 이내여야 합니다.' },
         { status: 400 }
       );
     }

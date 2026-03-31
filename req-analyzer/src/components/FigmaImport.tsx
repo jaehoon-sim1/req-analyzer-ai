@@ -4,12 +4,12 @@ import { useState, useEffect } from 'react';
 
 interface FigmaImportProps {
   onTextExtracted: (text: string) => void;
+  onAutoAnalyze?: () => void;
 }
 
 const FIGMA_TOKEN_KEY = 'figma_api_token';
 
 function extractFigmaFileKey(url: string): string | null {
-  // Figma URL: https://www.figma.com/design/FILE_KEY/... or /file/FILE_KEY/...
   const match = url.match(/figma\.com\/(?:file|design)\/([a-zA-Z0-9]+)/);
   return match ? match[1] : null;
 }
@@ -19,13 +19,16 @@ function extractNodeId(url: string): string | null {
   return match ? match[1].replace('-', ':') : null;
 }
 
-export default function FigmaImport({ onTextExtracted }: FigmaImportProps) {
+export default function FigmaImport({ onTextExtracted, onAutoAnalyze }: FigmaImportProps) {
   const [token, setToken] = useState('');
   const [figmaUrl, setFigmaUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [progressMsg, setProgressMsg] = useState('');
   const [error, setError] = useState('');
   const [info, setInfo] = useState('');
   const [tokenSaved, setTokenSaved] = useState(false);
+  const [isDone, setIsDone] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(FIGMA_TOKEN_KEY);
@@ -56,6 +59,7 @@ export default function FigmaImport({ onTextExtracted }: FigmaImportProps) {
   async function handleImport() {
     setError('');
     setInfo('');
+    setIsDone(false);
 
     if (!token.trim()) {
       setError('Figma API 토큰을 먼저 입력해주세요.');
@@ -71,30 +75,55 @@ export default function FigmaImport({ onTextExtracted }: FigmaImportProps) {
     const nodeId = extractNodeId(figmaUrl);
 
     setIsLoading(true);
-    setInfo('Figma 파일에서 텍스트를 추출하고 있습니다...');
+    setProgress(5);
+    setProgressMsg('Figma API에 연결하고 있습니다...');
 
     try {
+      // Phase 1: API 연결 (5% → 20%)
+      setProgress(20);
+      setProgressMsg('Figma 파일 구조를 가져오는 중...');
+
       const res = await fetch('/api/figma', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ token: token.trim(), fileKey, nodeId }),
       });
 
+      // Phase 2: 응답 수신 (20% → 60%)
+      setProgress(60);
+      setProgressMsg('텍스트 노드를 추출하는 중...');
+
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error || `Figma API 요청 실패 (${res.status})`);
       }
+
+      // Phase 3: JSON 파싱 (60% → 80%)
+      setProgress(80);
+      setProgressMsg('텍스트를 정리하는 중...');
 
       const data = await res.json();
       if (!data.text || data.text.trim().length === 0) {
         throw new Error('Figma 파일에서 텍스트를 찾을 수 없습니다.');
       }
 
-      setInfo(`텍스트 추출 완료: ${data.text.length.toLocaleString()}자 (${data.nodeCount}개 노드)`);
+      // Phase 4: 완료 (80% → 100%)
+      setProgress(100);
+      setProgressMsg(`텍스트 추출 완료! ${data.text.length.toLocaleString()}자 (${data.nodeCount}개 노드)`);
+      setIsDone(true);
+
+      // 텍스트를 전달 (textarea에 보이지 않고 내부 state에만 저장)
       onTextExtracted(data.text);
+
+      // 1초 후 자동 분석 시작
+      setTimeout(() => {
+        onAutoAnalyze?.();
+      }, 1000);
+
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Figma 연동 중 오류가 발생했습니다.');
-      setInfo('');
+      setProgress(0);
+      setProgressMsg('');
     } finally {
       setIsLoading(false);
     }
@@ -159,42 +188,66 @@ export default function FigmaImport({ onTextExtracted }: FigmaImportProps) {
         </p>
       </div>
 
-      {/* Import 버튼 */}
-      <button
-        data-testid="figma-import-btn"
-        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
-        onClick={handleImport}
-        disabled={isLoading || !token.trim() || !figmaUrl.trim()}
-      >
-        {isLoading ? (
-          <>
-            <svg className="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-            </svg>
-            Figma에서 텍스트 추출 중...
-          </>
-        ) : (
-          <>
-            <svg className="w-4 h-4" viewBox="0 0 38 57" fill="currentColor" aria-hidden="true">
-              <path d="M19 28.5a9.5 9.5 0 1 1 0-19 9.5 9.5 0 0 1 0 19z" fillOpacity=".8"/>
-              <path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fillOpacity=".4"/>
-              <path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fillOpacity=".6"/>
-              <path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fillOpacity=".8"/>
-              <path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fillOpacity=".6"/>
-            </svg>
-            Figma에서 텍스트 가져오기
-          </>
-        )}
-      </button>
+      {/* 진행률 표시 */}
+      {(isLoading || isDone) && (
+        <div className="bg-gray-950 border border-gray-800 rounded-lg p-4">
+          <div className="flex justify-between items-center mb-2">
+            <div className="flex items-center gap-2">
+              {isLoading && (
+                <svg className="animate-spin h-4 w-4 text-indigo-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
+                </svg>
+              )}
+              {isDone && (
+                <svg className="h-4 w-4 text-green-400" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+              )}
+              <span className="text-sm text-gray-300">{progressMsg}</span>
+            </div>
+            <span className={`text-sm font-mono ${isDone ? 'text-green-400' : 'text-indigo-400'}`}>{progress}%</span>
+          </div>
+          <div className="w-full h-2 bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className={`h-full rounded-full transition-all duration-700 ease-out ${isDone ? 'bg-green-500' : 'bg-indigo-500'}`}
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          {isDone && (
+            <p className="text-xs text-green-400 mt-2 animate-pulse">
+              추출 완료! 자동으로 분석을 시작합니다...
+            </p>
+          )}
+        </div>
+      )}
 
-      {/* Status messages */}
+      {/* Import 버튼 — 진행 중이거나 완료 시 숨김 */}
+      {!isLoading && !isDone && (
+        <button
+          data-testid="figma-import-btn"
+          className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2"
+          onClick={handleImport}
+          disabled={!token.trim() || !figmaUrl.trim()}
+        >
+          <svg className="w-4 h-4" viewBox="0 0 38 57" fill="currentColor" aria-hidden="true">
+            <path d="M19 28.5a9.5 9.5 0 1 1 0-19 9.5 9.5 0 0 1 0 19z" fillOpacity=".8"/>
+            <path d="M0 47.5A9.5 9.5 0 0 1 9.5 38H19v9.5a9.5 9.5 0 1 1-19 0z" fillOpacity=".4"/>
+            <path d="M19 0v19h9.5a9.5 9.5 0 1 0 0-19H19z" fillOpacity=".6"/>
+            <path d="M0 9.5A9.5 9.5 0 0 0 9.5 19H19V0H9.5A9.5 9.5 0 0 0 0 9.5z" fillOpacity=".8"/>
+            <path d="M0 28.5A9.5 9.5 0 0 0 9.5 38H19V19H9.5A9.5 9.5 0 0 0 0 28.5z" fillOpacity=".6"/>
+          </svg>
+          Figma에서 텍스트 가져오기
+        </button>
+      )}
+
+      {/* Error message */}
       {error && (
         <div className="bg-red-900/30 border border-red-800 rounded-lg p-3 text-sm text-red-300" data-testid="figma-error">
           {error}
         </div>
       )}
-      {info && !error && (
+      {info && !error && !isLoading && !isDone && (
         <div className="bg-indigo-900/30 border border-indigo-800 rounded-lg p-3 text-sm text-indigo-300" data-testid="figma-info">
           {info}
         </div>
