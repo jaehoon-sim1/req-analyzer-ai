@@ -3,10 +3,11 @@
 import { useState } from 'react';
 import { SAMPLES } from '@/data/samples';
 import FileUpload from '@/components/FileUpload';
+import FigmaImport from '@/components/FigmaImport';
 
 const MIN_CHARS = 10;
 
-type InputMode = 'text' | 'file';
+type InputMode = 'text' | 'file' | 'figma';
 
 interface InputSectionProps {
   value: string;
@@ -85,6 +86,19 @@ export default function InputSection({
         >
           파일 업로드
         </button>
+        <button
+          role="tab"
+          aria-selected={inputMode === 'figma'}
+          data-testid="input-mode-figma"
+          className={`px-4 py-1.5 text-xs font-semibold rounded-md transition ${
+            inputMode === 'figma'
+              ? 'bg-indigo-600 text-white shadow'
+              : 'text-gray-400 hover:text-gray-200'
+          }`}
+          onClick={() => handleModeChange('figma')}
+        >
+          Figma 연동
+        </button>
       </div>
 
       {/* Input area */}
@@ -103,8 +117,10 @@ export default function InputSection({
           />
           <span id="req-input-hint" className="sr-only">최소 10자 이상 입력해야 분석을 시작할 수 있습니다</span>
         </>
-      ) : (
+      ) : inputMode === 'file' ? (
         <FileUpload onTextExtracted={handleTextExtracted} />
+      ) : (
+        <FigmaImport onTextExtracted={handleTextExtracted} />
       )}
 
       {/* Sample buttons — only shown in text mode */}
