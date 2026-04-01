@@ -22,13 +22,37 @@ import {
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
 
+// 입력 텍스트가 너무 길면 앞부분만 사용 (토큰 오버플로 방지)
+const MAX_INPUT_CHARS = 30000;
+
+function truncateInput(text: string): string {
+  if (text.length <= MAX_INPUT_CHARS) return text;
+  const truncated = text.slice(0, MAX_INPUT_CHARS);
+  return truncated + `\n\n[... 이하 ${(text.length - MAX_INPUT_CHARS).toLocaleString()}자 생략 — 위 내용을 기반으로 분석해 주세요.]`;
+}
+
 async function callClaude(systemPrompt: string, userInput: string): Promise<string> {
+  const input = truncateInput(userInput);
   const message = await anthropic.messages.create({
     model: MODEL,
     max_tokens: 8192,
     system: systemPrompt,
-    messages: [{ role: 'user', content: userInput }],
+    messages: [{ role: 'user', content: input }],
   });
+
+  // stop_reason이 max_tokens이면 JSON이 잘렸을 가능성 높음
+  if (message.stop_reason === 'max_tokens') {
+    // 더 짧은 입력으로 재시도
+    const shorterInput = truncateInput(userInput.slice(0, Math.min(userInput.length, 15000)));
+    const retry = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 8192,
+      system: systemPrompt + '\n\n중요: 응답을 반드시 완전한 JSON으로 출력하세요. 항목 수를 줄이더라도 JSON 구조가 깨지지 않아야 합니다.',
+      messages: [{ role: 'user', content: shorterInput }],
+    });
+    const retryText = retry.content.find((b) => b.type === 'text');
+    return retryText?.text || '';
+  }
 
   const textBlock = message.content.find((b) => b.type === 'text');
   return textBlock?.text || '';
