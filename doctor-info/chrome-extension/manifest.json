@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "닥터인포 - AI 비서",
+  "version": "1.0.0",
+  "description": "팀을 위한 AI 지식 비서. Ctrl+Alt+Space로 빠르게 호출하세요.",
+  "permissions": ["sidePanel", "activeTab"],
+  "commands": {
+    "_execute_action": {
+      "suggested_key": {
+        "default": "Ctrl+Alt+Space",
+        "mac": "Command+Alt+Space"
+      },
+      "description": "닥터인포 사이드패널 열기/닫기"
+    }
+  },
+  "action": {
+    "default_title": "닥터인포 열기 (Ctrl+Alt+Space)"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
