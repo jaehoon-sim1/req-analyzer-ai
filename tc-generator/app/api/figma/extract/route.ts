@@ -36,17 +36,43 @@ export async function POST(request: NextRequest) {
 
     const { fileKey, nodeId } = parsed;
 
-    const res = await fetch(
-      `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
-      {
-        headers: {
-          "X-Figma-Token": figmaToken,
-        },
-      }
-    );
+    // Figma API 호출 (rate limit 시 자동 재시도)
+    const maxRetries = 3;
+    let res: Response | null = null;
 
-    if (!res.ok) {
-      if (res.status === 403) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      res = await fetch(
+        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
+        {
+          headers: {
+            "X-Figma-Token": figmaToken,
+          },
+        }
+      );
+
+      if (res.status === 429) {
+        if (attempt < maxRetries) {
+          // Retry-After 헤더가 있으면 사용, 없으면 기본 대기
+          const retryAfter = res.headers.get("Retry-After");
+          const delay = retryAfter ? parseInt(retryAfter, 10) * 1000 : (attempt + 1) * 5000;
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          continue;
+        }
+        return NextResponse.json(
+          {
+            error:
+              "Figma API 요청 제한 초과 (Rate Limit). 30초~1분 후 다시 시도해주세요. " +
+              "토큰 문제가 아닌 Figma 서버의 요청 횟수 제한입니다.",
+          },
+          { status: 429 }
+        );
+      }
+
+      break;
+    }
+
+    if (!res || !res.ok) {
+      if (res?.status === 403) {
         return NextResponse.json(
           {
             error:
@@ -55,16 +81,16 @@ export async function POST(request: NextRequest) {
           { status: 403 }
         );
       }
-      if (res.status === 404) {
+      if (res?.status === 404) {
         return NextResponse.json(
           { error: "Figma 파일을 찾을 수 없습니다. URL을 확인해주세요." },
           { status: 404 }
         );
       }
-      const errData = await res.json().catch(() => ({}));
+      const errData = await res?.json().catch(() => ({}));
       return NextResponse.json(
-        { error: errData?.err || `Figma API 오류 (${res.status})` },
-        { status: res.status }
+        { error: errData?.err || `Figma API 오류 (${res?.status})` },
+        { status: res?.status || 500 }
       );
     }
 
