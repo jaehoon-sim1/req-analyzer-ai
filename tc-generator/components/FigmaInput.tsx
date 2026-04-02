@@ -73,15 +73,15 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
       const { fileKey, nodeId } = parsed;
       const apiUrl = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
 
-      // 클라이언트에서 직접 Figma API 호출 + 자동 재시도 (최대 4회, 점진적 대기)
-      const maxRetries = 4;
+      // 클라이언트에서 직접 Figma API 호출 + 자동 재시도 (최대 3회, 긴 대기)
+      const maxRetries = 3;
       let res: Response | null = null;
 
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (attempt > 0) {
-          // 재시도 전 대기: 10초, 20초, 30초, 40초
-          const delay = attempt * 10000;
-          setExtractError(`Rate limit 발생 — ${delay / 1000}초 후 재시도 (${attempt}/${maxRetries})...`);
+          // 재시도 전 대기: 30초, 60초, 90초
+          const delay = attempt * 30000;
+          setExtractError(`Rate limit 발생 — ${delay / 1000}초 대기 후 재시도 (${attempt}/${maxRetries})...`);
           await new Promise((r) => setTimeout(r, delay));
           setExtractError("");
         }
