@@ -279,7 +279,44 @@ function fixUnescapedNewlines(jsonStr: string): string {
   return result;
 }
 
+function tryRepairTruncatedJson(text: string): unknown | null {
+  // max_tokens로 잘린 JSON 복구 시도
+  let repaired = text.trim();
+
+  // 열린 괄호/대괄호 수 카운트
+  let braces = 0;
+  let brackets = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (const ch of repaired) {
+    if (escaped) { escaped = false; continue; }
+    if (ch === "\\") { escaped = true; continue; }
+    if (ch === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (ch === "{") braces++;
+    if (ch === "}") braces--;
+    if (ch === "[") brackets++;
+    if (ch === "]") brackets--;
+  }
+
+  // 문자열 안에서 잘렸으면 닫아줌
+  if (inString) repaired += '"';
+
+  // 닫히지 않은 괄호 닫기
+  while (brackets > 0) { repaired += "]"; brackets--; }
+  while (braces > 0) { repaired += "}"; braces--; }
+
+  try {
+    return JSON.parse(repaired);
+  } catch {
+    return null;
+  }
+}
+
 function parseJsonResponse(text: string): TestSection[] {
+  console.log("[parseJsonResponse] 응답 길이:", text.length, "처음 200자:", text.slice(0, 200));
+
   // 코드블록 제거
   let jsonText = text
     .replace(/```json\n?/g, "")
@@ -297,12 +334,12 @@ function parseJsonResponse(text: string): TestSection[] {
   try {
     parsed = JSON.parse(jsonText);
   } catch {
-    // 첫 번째 시도 실패 → 문자열 내 이스케이프되지 않은 줄바꿈 수정 후 재시도
+    // 2단계: 이스케이프되지 않은 줄바꿈 수정 후 재시도
     try {
       const fixed = fixUnescapedNewlines(jsonText);
       parsed = JSON.parse(fixed);
     } catch {
-      // 배열 형태인지 시도 (AI가 [{...}, {...}] 형태로 반환하는 경우)
+      // 3단계: 배열 형태 시도
       const arrStart = text.indexOf("[");
       const arrEnd = text.lastIndexOf("]");
       if (arrStart !== -1 && arrEnd > arrStart) {
@@ -311,21 +348,26 @@ function parseJsonResponse(text: string): TestSection[] {
           const fixed = fixUnescapedNewlines(arrText);
           parsed = { sections: JSON.parse(fixed) };
         } catch {
-          console.error(
-            "AI 응답 파싱 실패. 원본 응답 (처음 500자):",
-            text.slice(0, 500)
-          );
-          throw new Error(
-            "AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해주세요."
-          );
+          // 4단계: 잘린 JSON 복구 시도
+          const fixedText = fixUnescapedNewlines(jsonText);
+          parsed = tryRepairTruncatedJson(fixedText);
         }
       } else {
+        // 4단계: 잘린 JSON 복구 시도
+        const fixedText = fixUnescapedNewlines(jsonText);
+        parsed = tryRepairTruncatedJson(fixedText);
+      }
+
+      if (!parsed) {
         console.error(
-          "AI 응답 파싱 실패. 원본 응답 (처음 500자):",
-          text.slice(0, 500)
+          "AI 응답 파싱 최종 실패. 원본 응답 (처음 800자):",
+          text.slice(0, 800),
+          "마지막 200자:",
+          text.slice(-200)
         );
         throw new Error(
-          "AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해주세요."
+          "AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해주세요.\n" +
+          `(응답 길이: ${text.length}자, 마지막: ...${text.slice(-80)})`
         );
       }
     }
