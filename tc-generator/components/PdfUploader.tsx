@@ -65,7 +65,18 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
           throw new Error(data.error || "PDF 파싱 실패");
         }
 
-        setPdfText(data.text);
+        // PDF 텍스트 추출 품질 검사
+        const extractedText = (data.text || "").trim();
+        if (extractedText.length < 50) {
+          alert(
+            "PDF에서 텍스트를 충분히 추출할 수 없습니다.\n" +
+            "이 PDF는 이미지 기반일 수 있습니다.\n\n" +
+            "→ PDF 대신 이미지(PNG/JPG)로 업로드해주세요.\n" +
+            "→ 또는 텍스트 입력 탭에 내용을 직접 붙여넣어주세요."
+          );
+          return;
+        }
+        setPdfText(extractedText);
         setFileName(data.fileName);
         setPages(data.pages);
         setFileType("pdf");

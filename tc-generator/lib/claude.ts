@@ -365,6 +365,17 @@ function parseJsonResponse(text: string): TestSection[] {
           "마지막 200자:",
           text.slice(-200)
         );
+
+        // AI가 JSON 대신 텍스트 설명을 반환한 경우 감지
+        const hasJson = text.includes("{") && text.includes("}");
+        if (!hasJson) {
+          throw new Error(
+            "AI가 테스트 케이스를 생성하지 못했습니다.\n" +
+            "입력된 요구사항이 부족하거나 불명확할 수 있습니다.\n" +
+            "→ 더 상세한 요구사항을 입력하거나, 이미지로 업로드해보세요."
+          );
+        }
+
         throw new Error(
           "AI 응답을 JSON으로 파싱할 수 없습니다. 다시 시도해주세요.\n" +
           `(응답 길이: ${text.length}자, 마지막: ...${text.slice(-80)})`
