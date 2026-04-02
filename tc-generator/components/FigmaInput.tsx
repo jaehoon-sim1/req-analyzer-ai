@@ -70,40 +70,54 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
 
     try {
       const { fileKey, nodeId } = parsed;
+      const apiUrl = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
 
-      // 클라이언트에서 직접 Figma API 호출 (Vercel 서버 IP rate limit 우회)
-      const res = await fetch(
-        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
-        {
-          headers: { "X-Figma-Token": figmaToken },
+      // 클라이언트에서 직접 Figma API 호출 + 자동 재시도 (최대 4회, 점진적 대기)
+      const maxRetries = 4;
+      let res: Response | null = null;
+
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          // 재시도 전 대기: 10초, 20초, 30초, 40초
+          const delay = attempt * 10000;
+          setExtractError(`Rate limit 발생 — ${delay / 1000}초 후 재시도 (${attempt}/${maxRetries})...`);
+          await new Promise((r) => setTimeout(r, delay));
+          setExtractError("");
         }
-      );
 
-      if (!res.ok) {
-        // 에러 응답 본문 읽기
-        const errBody = await res.text().catch(() => "");
+        res = await fetch(apiUrl, {
+          headers: { "X-Figma-Token": figmaToken },
+        });
+
+        if (res.status !== 429) break;
+        console.warn(`[Figma] 429 Rate Limit, attempt ${attempt + 1}/${maxRetries + 1}`);
+      }
+
+      if (!res || !res.ok) {
+        const errBody = await res?.text().catch(() => "") || "";
         let errData: Record<string, string> = {};
         try { errData = JSON.parse(errBody); } catch { /* not json */ }
         const errMsg = errData?.message || errData?.err || "";
 
-        console.error(`[Figma] status=${res.status}, body=${errBody.slice(0, 300)}`);
+        console.error(`[Figma] status=${res?.status}, body=${errBody.slice(0, 300)}`);
 
-        if (res.status === 429 || errMsg.toLowerCase().includes("rate limit")) {
+        if (res?.status === 429 || errMsg.toLowerCase().includes("rate limit")) {
           throw new Error(
-            `Figma API 요청 제한 (${res.status}). 1~2분 후 다시 시도해주세요.\n` +
-            `응답: ${errMsg || errBody.slice(0, 100)}`
+            "Figma API 요청 제한이 지속됩니다.\n" +
+            "토큰의 요청 횟수가 초과된 상태입니다.\n" +
+            "→ Figma Settings에서 새 Personal Access Token을 발급하면 즉시 해결될 수 있습니다."
           );
         }
-        if (res.status === 403) {
+        if (res?.status === 403) {
           throw new Error(
             `Figma 접근 거부 (403): ${errMsg || "토큰이 유효하지 않거나 파일 접근 권한 없음"}\n` +
             `토큰을 다시 확인하거나, Figma Settings에서 새로 발급해주세요.`
           );
         }
-        if (res.status === 404) {
+        if (res?.status === 404) {
           throw new Error("Figma 파일을 찾을 수 없습니다. URL을 확인해주세요.");
         }
-        throw new Error(`Figma API 오류 (${res.status}): ${errMsg || errBody.slice(0, 100)}`);
+        throw new Error(`Figma API 오류 (${res?.status}): ${errMsg || errBody.slice(0, 100)}`);
       }
 
       const data = await res.json();
