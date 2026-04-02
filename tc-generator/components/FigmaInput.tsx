@@ -80,27 +80,30 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
       );
 
       if (!res.ok) {
-        if (res.status === 429) {
+        // 에러 응답 본문 읽기
+        const errBody = await res.text().catch(() => "");
+        let errData: Record<string, string> = {};
+        try { errData = JSON.parse(errBody); } catch { /* not json */ }
+        const errMsg = errData?.message || errData?.err || "";
+
+        console.error(`[Figma] status=${res.status}, body=${errBody.slice(0, 300)}`);
+
+        if (res.status === 429 || errMsg.toLowerCase().includes("rate limit")) {
           throw new Error(
-            "Figma API 요청 제한 초과 (Rate Limit). 1~2분 후 다시 시도해주세요."
+            `Figma API 요청 제한 (${res.status}). 1~2분 후 다시 시도해주세요.\n` +
+            `응답: ${errMsg || errBody.slice(0, 100)}`
           );
         }
         if (res.status === 403) {
-          const errData = await res.json().catch(() => ({}));
-          const errMsg = String(errData?.message || errData?.err || "");
-          if (errMsg.toLowerCase().includes("rate limit")) {
-            throw new Error(
-              "Figma API 요청 제한 초과. 1~2분 후 다시 시도해주세요."
-            );
-          }
           throw new Error(
-            "Figma 액세스 토큰이 유효하지 않거나 파일 접근 권한이 없습니다.\n토큰을 다시 확인해주세요."
+            `Figma 접근 거부 (403): ${errMsg || "토큰이 유효하지 않거나 파일 접근 권한 없음"}\n` +
+            `토큰을 다시 확인하거나, Figma Settings에서 새로 발급해주세요.`
           );
         }
         if (res.status === 404) {
           throw new Error("Figma 파일을 찾을 수 없습니다. URL을 확인해주세요.");
         }
-        throw new Error(`Figma API 오류 (${res.status})`);
+        throw new Error(`Figma API 오류 (${res.status}): ${errMsg || errBody.slice(0, 100)}`);
       }
 
       const data = await res.json();
