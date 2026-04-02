@@ -1,0 +1,110 @@
+import { NextRequest, NextResponse } from "next/server";
+import {
+  parseFigmaUrl,
+  extractTextFromNodes,
+  extractFrameGroups,
+  FigmaNode,
+} from "@/lib/figma";
+
+// Corporate proxy SSL workaround (development only)
+if (process.env.NODE_ENV === "development") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { figmaUrl, figmaToken } = body;
+
+    if (!figmaUrl || !figmaToken) {
+      return NextResponse.json(
+        { error: "Figma URL과 액세스 토큰이 필요합니다." },
+        { status: 400 }
+      );
+    }
+
+    const parsed = parseFigmaUrl(figmaUrl);
+    if (!parsed) {
+      return NextResponse.json(
+        {
+          error:
+            "올바른 Figma 페이지 URL을 입력해주세요. (예: https://www.figma.com/design/xxxxx/Name?node-id=0-1)",
+        },
+        { status: 400 }
+      );
+    }
+
+    const { fileKey, nodeId } = parsed;
+
+    const res = await fetch(
+      `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
+      {
+        headers: {
+          "X-Figma-Token": figmaToken,
+        },
+      }
+    );
+
+    if (!res.ok) {
+      if (res.status === 403) {
+        return NextResponse.json(
+          {
+            error:
+              "Figma 액세스 토큰이 유효하지 않거나 해당 파일에 접근 권한이 없습니다.",
+          },
+          { status: 403 }
+        );
+      }
+      if (res.status === 404) {
+        return NextResponse.json(
+          { error: "Figma 파일을 찾을 수 없습니다. URL을 확인해주세요." },
+          { status: 404 }
+        );
+      }
+      const errData = await res.json().catch(() => ({}));
+      return NextResponse.json(
+        { error: errData?.err || `Figma API 오류 (${res.status})` },
+        { status: res.status }
+      );
+    }
+
+    const data = await res.json();
+    const nodeData = data.nodes?.[nodeId];
+
+    if (!nodeData?.document) {
+      return NextResponse.json(
+        { error: "해당 노드를 찾을 수 없습니다. URL의 node-id를 확인해주세요." },
+        { status: 400 }
+      );
+    }
+
+    const document = nodeData.document as FigmaNode;
+    const pageName = document.name;
+    const texts = extractTextFromNodes(document);
+    const frames = extractFrameGroups(document);
+
+    if (texts.length === 0 && frames.length === 0) {
+      return NextResponse.json(
+        {
+          error:
+            "해당 페이지에서 텍스트를 추출할 수 없습니다. 텍스트 레이어가 포함된 페이지를 선택해주세요.",
+        },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json({
+      pageName,
+      texts,
+      frames,
+      nodeCount: texts.length,
+    });
+  } catch (error) {
+    console.error("Figma extract error:", error);
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Figma 데이터 추출 중 오류가 발생했습니다.";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
