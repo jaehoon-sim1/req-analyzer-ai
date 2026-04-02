@@ -72,11 +72,34 @@ export async function POST(request: NextRequest) {
     }
 
     if (!res || !res.ok) {
+      const errBody = await res?.text().catch(() => "");
+      console.error(`Figma API error - status: ${res?.status}, body: ${errBody}`);
+
+      let errData: Record<string, unknown> = {};
+      try {
+        errData = JSON.parse(errBody || "{}");
+      } catch {
+        // not JSON
+      }
+
       if (res?.status === 403) {
+        // Figma는 rate limit을 403 + "Rate limit exceeded" 메시지로 반환하기도 함
+        const errMsg = String(errData?.message || errData?.err || "");
+        if (errMsg.toLowerCase().includes("rate limit")) {
+          return NextResponse.json(
+            {
+              error:
+                "Figma API 요청 제한 초과. 1~2분 후 다시 시도해주세요.\n" +
+                "계속 발생하면 Figma에서 새 Personal Access Token을 발급해보세요.",
+            },
+            { status: 429 }
+          );
+        }
         return NextResponse.json(
           {
             error:
-              "Figma 액세스 토큰이 유효하지 않거나 해당 파일에 접근 권한이 없습니다.",
+              "Figma 액세스 토큰이 유효하지 않거나 해당 파일에 접근 권한이 없습니다.\n" +
+              "토큰을 다시 확인하거나, Figma Settings에서 새로 발급해주세요.",
           },
           { status: 403 }
         );
@@ -87,9 +110,13 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
-      const errData = await res?.json().catch(() => ({}));
       return NextResponse.json(
-        { error: errData?.err || `Figma API 오류 (${res?.status})` },
+        {
+          error:
+            errData?.message ||
+            errData?.err ||
+            `Figma API 오류 (${res?.status}): ${errBody?.slice(0, 200)}`,
+        },
         { status: res?.status || 500 }
       );
     }
