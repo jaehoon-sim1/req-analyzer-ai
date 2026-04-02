@@ -67,7 +67,7 @@ export async function generateTestCases(
   userPrompt: string,
   apiKey: string,
   provider: AIProvider = "gemini",
-  imageBase64?: string
+  imageBase64?: string | string[]
 ): Promise<TestSection[]> {
   if (!apiKey) {
     throw new Error("API 키가 입력되지 않았습니다.");
@@ -89,7 +89,7 @@ export async function generateTestCases(
 async function generateWithClaude(
   userPrompt: string,
   apiKey: string,
-  imageBase64?: string
+  imageBase64?: string | string[]
 ): Promise<TestSection[]> {
   const client = new Anthropic({ apiKey });
 
@@ -99,8 +99,12 @@ async function generateWithClaude(
     { type: "text" as const, text: userPrompt },
   ];
 
-  if (imageBase64) {
-    const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
+  const images = imageBase64
+    ? Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+    : [];
+
+  for (const img of images) {
+    const match = img.match(/^data:(image\/\w+);base64,(.+)$/);
     if (match) {
       (content as Anthropic.ContentBlockParam[]).push({
         type: "image" as const,
@@ -131,7 +135,7 @@ async function generateWithClaude(
 async function generateWithGemini(
   userPrompt: string,
   apiKey: string,
-  imageBase64?: string
+  imageBase64?: string | string[]
 ): Promise<TestSection[]> {
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
@@ -139,16 +143,21 @@ async function generateWithGemini(
     systemInstruction: TC_SYSTEM_PROMPT,
   });
 
-  if (imageBase64) {
-    const match = imageBase64.match(/^data:(image\/\w+);base64,(.+)$/);
-    if (!match) throw new Error("잘못된 이미지 데이터입니다.");
-    const mimeType = match[1];
-    const base64Data = match[2];
+  const images = imageBase64
+    ? Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+    : [];
 
-    const result = await model.generateContent([
-      userPrompt,
-      { inlineData: { mimeType, data: base64Data } },
-    ]);
+  if (images.length > 0) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const parts: any[] = [userPrompt];
+    for (const img of images) {
+      const match = img.match(/^data:(image\/\w+);base64,(.+)$/);
+      if (match) {
+        parts.push({ inlineData: { mimeType: match[1], data: match[2] } });
+      }
+    }
+
+    const result = await model.generateContent(parts);
     const text = result.response.text();
     if (!text) throw new Error("No response from Gemini");
     return parseJsonResponse(text);
@@ -167,7 +176,7 @@ async function generateWithGemini(
 async function generateWithOpenRouter(
   userPrompt: string,
   apiKey: string,
-  imageBase64?: string
+  imageBase64?: string | string[]
 ): Promise<TestSection[]> {
   type MessageContent =
     | string
@@ -176,12 +185,19 @@ async function generateWithOpenRouter(
         | { type: "image_url"; image_url: { url: string } }
       >;
 
+  const images = imageBase64
+    ? Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+    : [];
+
   let userContent: MessageContent;
 
-  if (imageBase64) {
+  if (images.length > 0) {
     userContent = [
       { type: "text", text: userPrompt },
-      { type: "image_url", image_url: { url: imageBase64 } },
+      ...images.map((img) => ({
+        type: "image_url" as const,
+        image_url: { url: img },
+      })),
     ];
   } else {
     userContent = userPrompt;

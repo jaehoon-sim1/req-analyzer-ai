@@ -104,7 +104,14 @@ ${pdfText}
 위 문서에서 기능명, 기능 상세 설명, 주요 정책을 파악하여 빠짐없이 TestCase를 JSON 형식으로 생성해주세요.`;
 }
 
-export function buildImageUserPrompt(): string {
+export function buildImageUserPrompt(chunkCount?: number): string {
+  if (chunkCount && chunkCount > 1) {
+    return `첨부된 ${chunkCount}개의 이미지는 하나의 소프트웨어 요구사항/기획서 이미지를 분할한 것입니다.
+모든 이미지를 종합하여 전체 내용을 파악한 후 TestCase를 생성해주세요.
+
+왼쪽 위(1번) → 오른쪽 위(2번) → 왼쪽 아래(3번) → 오른쪽 아래(4번) 순서로 배치되어 있습니다.
+이미지에서 기능명, 기능 상세 설명, 주요 정책을 파악하여 빠짐없이 TestCase를 JSON 형식으로 생성해주세요.`;
+  }
   return `첨부된 이미지는 소프트웨어 요구사항 문서입니다. 이미지에서 텍스트와 내용을 분석하여 TestCase를 생성해주세요.
 
 이미지에서 기능명, 기능 상세 설명, 주요 정책을 파악하여 빠짐없이 TestCase를 JSON 형식으로 생성해주세요.`;

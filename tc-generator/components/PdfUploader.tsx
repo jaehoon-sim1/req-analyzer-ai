@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 
 interface Props {
-  onGenerate: (data: { pdfText?: string; imageBase64?: string }) => void;
+  onGenerate: (data: { pdfText?: string; imageBase64?: string | string[] }) => void;
   isLoading: boolean;
 }
 
@@ -24,7 +24,7 @@ function isPdfFile(name: string): boolean {
 
 export default function PdfUploader({ onGenerate, isLoading }: Props) {
   const [pdfText, setPdfText] = useState("");
-  const [imageBase64, setImageBase64] = useState("");
+  const [imageBase64, setImageBase64] = useState<string | string[]>("");
   const [fileName, setFileName] = useState("");
   const [pages, setPages] = useState(0);
   const [isParsing, setIsParsing] = useState(false);
@@ -33,7 +33,7 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
 
   const resetState = () => {
     setPdfText("");
-    setImageBase64("");
+    setImageBase64([]);
     setFileName("");
     setPages(0);
     setFileType("");
@@ -71,8 +71,9 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
         setFileType("pdf");
       } else if (isImageFile(file.name)) {
         const base64 = await fileToBase64(file);
-        setImageBase64(base64);
-        setFileName(file.name);
+        const chunks = await splitImageIfLarge(base64);
+        setImageBase64(chunks.length === 1 ? chunks[0] : chunks);
+        setFileName(file.name + (chunks.length > 1 ? ` (${chunks.length}분할)` : ""));
         setFileType("image");
       }
     } catch (err) {
@@ -100,7 +101,7 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
     [handleFile]
   );
 
-  const hasFile = fileType === "pdf" ? !!pdfText : !!imageBase64;
+  const hasFile = fileType === "pdf" ? !!pdfText : Array.isArray(imageBase64) ? imageBase64.length > 0 : !!imageBase64;
 
   return (
     <div className="space-y-5">
@@ -203,13 +204,27 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
             )}
 
             {fileType === "image" && (
-              <div className="flex justify-center bg-white border rounded p-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={imageBase64}
-                  alt="업로드된 이미지"
-                  className="max-h-60 object-contain rounded"
-                />
+              <div className="bg-white border rounded p-3">
+                {Array.isArray(imageBase64) ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    {imageBase64.map((chunk, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={chunk}
+                        alt={`분할 ${i + 1}`}
+                        className="max-h-40 object-contain rounded border"
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={imageBase64}
+                    alt="업로드된 이미지"
+                    className="max-h-60 object-contain rounded mx-auto"
+                  />
+                )}
               </div>
             )}
           </div>
@@ -262,5 +277,51 @@ function fileToBase64(file: File): Promise<string> {
     reader.onload = () => resolve(reader.result as string);
     reader.onerror = reject;
     reader.readAsDataURL(file);
+  });
+}
+
+/**
+ * 고해상도 이미지를 2x2 (4분할)로 자동 분할
+ * 너비 > 1500px일 때만 분할, 아니면 원본 반환
+ */
+function splitImageIfLarge(dataUrl: string): Promise<string[]> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      // 작은 이미지는 분할 불필요
+      if (img.width <= 1500) {
+        resolve([dataUrl]);
+        return;
+      }
+
+      const cols = 2;
+      const rows = 2;
+      const chunkW = Math.ceil(img.width / cols);
+      const chunkH = Math.ceil(img.height / rows);
+      const chunks: string[] = [];
+
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+          const canvas = document.createElement("canvas");
+          const sx = c * chunkW;
+          const sy = r * chunkH;
+          const sw = Math.min(chunkW, img.width - sx);
+          const sh = Math.min(chunkH, img.height - sy);
+
+          canvas.width = sw;
+          canvas.height = sh;
+
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+            chunks.push(canvas.toDataURL("image/jpeg", 0.92));
+          }
+        }
+      }
+
+      resolve(chunks.length > 0 ? chunks : [dataUrl]);
+    };
+    img.onerror = () => resolve([dataUrl]);
+    img.src = dataUrl;
   });
 }

@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
       }
-      userPrompt = buildImageUserPrompt();
+      const chunkCount = Array.isArray(imageBase64) ? imageBase64.length : 1;
+      userPrompt = buildImageUserPrompt(chunkCount);
       excelTitle = "이미지 요구사항";
     } else if (mode === "pdf") {
       if (!pdfText) {
@@ -128,11 +129,16 @@ export async function POST(request: NextRequest) {
             }, 4000);
 
             // Actual AI call
+            // imageBase64가 배열이면 그대로, 문자열이면 배열로 래핑
+            const imageData = imageBase64
+              ? Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+              : undefined;
+
             const sections = await generateTestCases(
               userPrompt,
               apiKey,
               (provider || "gemini") as AIProvider,
-              imageBase64
+              imageData
             );
 
             clearInterval(interval);
@@ -173,11 +179,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Non-streaming mode (backward compatible)
+    const imageDataNonStream = imageBase64
+      ? Array.isArray(imageBase64) ? imageBase64 : [imageBase64]
+      : undefined;
     const sections = await generateTestCases(
       userPrompt,
       apiKey,
       (provider || "gemini") as AIProvider,
-      imageBase64
+      imageDataNonStream
     );
 
     if (body.preview) {
