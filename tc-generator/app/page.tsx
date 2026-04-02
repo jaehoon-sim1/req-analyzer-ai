@@ -213,11 +213,12 @@ export default function Home() {
   const handleFileGenerate = async (data: {
     pdfText?: string;
     imageBase64?: string | string[];
+    supplementText?: string;
   }) => {
     const isImage = !!data.imageBase64;
     await streamGenerate({
       ...(isImage
-        ? { imageBase64: data.imageBase64, mode: "image" }
+        ? { imageBase64: data.imageBase64, supplementText: data.supplementText, mode: "image" }
         : { pdfText: data.pdfText, mode: "pdf" }),
       preview: true,
     });

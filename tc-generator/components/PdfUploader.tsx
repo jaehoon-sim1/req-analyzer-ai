@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react";
 
 interface Props {
-  onGenerate: (data: { pdfText?: string; imageBase64?: string | string[] }) => void;
+  onGenerate: (data: { pdfText?: string; imageBase64?: string | string[]; supplementText?: string }) => void;
   isLoading: boolean;
 }
 
@@ -30,6 +30,7 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
   const [isParsing, setIsParsing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [fileType, setFileType] = useState<"pdf" | "image" | "">("");
+  const [supplementText, setSupplementText] = useState("");
 
   const resetState = () => {
     setPdfText("");
@@ -37,6 +38,7 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
     setFileName("");
     setPages(0);
     setFileType("");
+    setSupplementText("");
   };
 
   const handleFile = useCallback(async (file: File) => {
@@ -240,10 +242,31 @@ export default function PdfUploader({ onGenerate, isLoading }: Props) {
             )}
           </div>
 
+          {/* 이미지 업로드 시 보조 텍스트 입력 */}
+          {fileType === "image" && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1">
+                보조 텍스트 <span className="text-gray-400 font-normal">(선택사항 — 오타 방지용)</span>
+              </label>
+              <textarea
+                value={supplementText}
+                onChange={(e) => setSupplementText(e.target.value)}
+                placeholder="이미지의 텍스트를 붙여넣으면 AI가 더 정확하게 TC를 생성합니다.&#10;예: 기획서의 Description 내용, 화면 설명, 정책 등"
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y text-gray-900 placeholder-gray-400"
+              />
+              <p className="mt-1 text-xs text-gray-400">
+                기획서에서 텍스트를 복사해서 붙여넣으면 AI 인식 오타가 줄어듭니다.
+              </p>
+            </div>
+          )}
+
           <button
             onClick={() =>
               onGenerate(
-                fileType === "pdf" ? { pdfText } : { imageBase64 }
+                fileType === "pdf"
+                  ? { pdfText }
+                  : { imageBase64, supplementText: supplementText.trim() || undefined }
               )
             }
             disabled={isLoading}

@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
       stream,
       feedback,
       previousResult,
+      supplementText,
     } = body;
 
     let userPrompt: string;
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
             );
       }
       const chunkCount = Array.isArray(imageBase64) ? imageBase64.length : 1;
-      userPrompt = buildImageUserPrompt(chunkCount);
+      userPrompt = buildImageUserPrompt(chunkCount, supplementText);
       excelTitle = "이미지 요구사항";
     } else if (mode === "pdf") {
       if (!pdfText) {
