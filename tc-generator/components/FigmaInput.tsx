@@ -38,8 +38,9 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
   }, []);
 
   const handleTokenChange = (token: string) => {
-    setFigmaToken(token);
-    localStorage.setItem("figma_access_token", token);
+    const trimmed = token.trim();
+    setFigmaToken(trimmed);
+    localStorage.setItem("figma_access_token", trimmed);
   };
 
   const handleUrlChange = (url: string) => {
@@ -86,7 +87,7 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
         }
 
         res = await fetch(apiUrl, {
-          headers: { "X-Figma-Token": figmaToken },
+          headers: { "X-Figma-Token": figmaToken.trim() },
         });
 
         if (res.status !== 429) break;
