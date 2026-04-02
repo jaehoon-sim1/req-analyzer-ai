@@ -1,7 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { parseFigmaUrl } from "@/lib/figma";
+import {
+  parseFigmaUrl,
+  extractTextFromNodes,
+  extractFrameGroups,
+  FigmaNode,
+} from "@/lib/figma";
 
 interface FigmaFrame {
   frameName: string;
@@ -64,21 +69,62 @@ export default function FigmaInput({ onGenerate, isLoading }: Props) {
     setIsExtracting(true);
 
     try {
-      const res = await fetch("/api/figma/extract", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ figmaUrl, figmaToken }),
-      });
+      const { fileKey, nodeId } = parsed;
 
-      const data = await res.json();
+      // 클라이언트에서 직접 Figma API 호출 (Vercel 서버 IP rate limit 우회)
+      const res = await fetch(
+        `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`,
+        {
+          headers: { "X-Figma-Token": figmaToken },
+        }
+      );
 
       if (!res.ok) {
-        throw new Error(data.error || "Figma 추출 실패");
+        if (res.status === 429) {
+          throw new Error(
+            "Figma API 요청 제한 초과 (Rate Limit). 1~2분 후 다시 시도해주세요."
+          );
+        }
+        if (res.status === 403) {
+          const errData = await res.json().catch(() => ({}));
+          const errMsg = String(errData?.message || errData?.err || "");
+          if (errMsg.toLowerCase().includes("rate limit")) {
+            throw new Error(
+              "Figma API 요청 제한 초과. 1~2분 후 다시 시도해주세요."
+            );
+          }
+          throw new Error(
+            "Figma 액세스 토큰이 유효하지 않거나 파일 접근 권한이 없습니다.\n토큰을 다시 확인해주세요."
+          );
+        }
+        if (res.status === 404) {
+          throw new Error("Figma 파일을 찾을 수 없습니다. URL을 확인해주세요.");
+        }
+        throw new Error(`Figma API 오류 (${res.status})`);
       }
 
-      setExtractedTexts(data.texts);
-      setExtractedFrames(data.frames || null);
-      setPageName(data.pageName);
+      const data = await res.json();
+      const nodeData = data.nodes?.[nodeId];
+
+      if (!nodeData?.document) {
+        throw new Error(
+          "해당 노드를 찾을 수 없습니다. URL의 node-id를 확인해주세요."
+        );
+      }
+
+      const document = nodeData.document as FigmaNode;
+      const texts = extractTextFromNodes(document);
+      const frames = extractFrameGroups(document);
+
+      if (texts.length === 0 && frames.length === 0) {
+        throw new Error(
+          "해당 페이지에서 텍스트를 추출할 수 없습니다. 텍스트 레이어가 포함된 페이지를 선택해주세요."
+        );
+      }
+
+      setExtractedTexts(texts);
+      setExtractedFrames(frames.length > 0 ? frames : null);
+      setPageName(document.name);
     } catch (err) {
       setExtractError(
         err instanceof Error ? err.message : "Figma 추출 중 오류 발생"
