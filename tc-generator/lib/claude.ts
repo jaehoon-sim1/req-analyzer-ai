@@ -371,7 +371,7 @@ function parseJsonResponse(text: string): TestSection[] {
     );
   }
 
-  // 필드명 정규화 (test_cases → testCases 등)
+  // 필드명 정규화 (test_cases → testCases, doc_info → docInfo 등)
   return sections.map((s: unknown) => {
     const sec = s as Record<string, unknown>;
     const testCases = (sec.testCases || sec.test_cases || []) as Record<
@@ -389,6 +389,10 @@ function parseJsonResponse(text: string): TestSection[] {
         (sec.section_title as string) ||
         (sec.title as string) ||
         "테스트 섹션",
+      tcPrefix:
+        (sec.tcPrefix as string) ||
+        (sec.tc_prefix as string) ||
+        undefined,
       testCases: testCases.map((tc) => ({
         depth1:
           (tc.depth1 as string) || (tc.depth_1 as string) || "",
@@ -413,6 +417,10 @@ function parseJsonResponse(text: string): TestSection[] {
           (tc.expected_result as string) ||
           (tc.expected as string) ||
           "",
+        docInfo:
+          (tc.docInfo as string) ||
+          (tc.doc_info as string) ||
+          undefined,
         docPage:
           (tc.docPage as string) ||
           (tc.doc_page as string) ||

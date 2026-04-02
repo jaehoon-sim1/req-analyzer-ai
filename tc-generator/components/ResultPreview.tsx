@@ -23,9 +23,9 @@ function TCTable({
   toggleSection: (i: number) => void;
   compact?: boolean;
 }) {
-  // docPage가 하나라도 있으면 컬럼 표시
-  const hasDocPage = sections.some((s) =>
-    s.testCases.some((tc) => tc.docPage)
+  // docInfo 또는 docPage가 하나라도 있으면 컬럼 표시
+  const hasDocInfo = sections.some((s) =>
+    s.testCases.some((tc) => tc.docInfo || tc.docPage)
   );
 
   return (
@@ -79,9 +79,9 @@ function TCTable({
                     <th className="px-3 py-2 text-left font-medium text-gray-600 min-w-[200px]">
                       기대 결과
                     </th>
-                    {hasDocPage && (
+                    {hasDocInfo && (
                       <th className="px-3 py-2 text-left font-medium text-gray-600 min-w-[100px]">
-                        Doc Page
+                        Doc info
                       </th>
                     )}
                   </tr>
@@ -122,9 +122,9 @@ function TCTable({
                       <td className="px-3 py-2 text-gray-800 whitespace-pre-line">
                         {tc.expectedResult}
                       </td>
-                      {hasDocPage && (
+                      {hasDocInfo && (
                         <td className="px-3 py-2 text-blue-600 text-xs font-mono">
-                          {tc.docPage || "-"}
+                          {tc.docInfo || tc.docPage || "-"}
                         </td>
                       )}
                     </tr>

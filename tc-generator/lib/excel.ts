@@ -32,7 +32,7 @@ export async function generateExcel(
   // --- TestCase Sheet ---
   const ws = workbook.addWorksheet("TestCase");
 
-  // Column widths
+  // Column widths (예시 파일 기준)
   ws.getColumn(1).width = 0.75; // A
   ws.getColumn(2).width = 0.75; // B
   ws.getColumn(3).width = 12; // C - Story ID
@@ -107,6 +107,19 @@ export async function generateExcel(
   ws.getCell("J5").alignment = { horizontal: "center", vertical: "middle" };
   applyBorderRange(ws, 5, 5, 10, 13);
 
+  // 전체 진행률 (N5:O5)
+  ws.getCell("N5").value = "전체 진행률";
+  ws.getCell("N5").font = { name: FONT_NAME, size: 10, bold: true };
+  ws.getCell("N5").alignment = { horizontal: "center", vertical: "middle" };
+  ws.getCell("N5").border = THIN_BORDER;
+  ws.getCell("O5").value = {
+    formula: 'IFERROR(((E7+F7+G7+I7)/D7),"-")',
+    result: 0,
+  } as ExcelJS.CellFormulaValue;
+  ws.getCell("O5").font = { name: FONT_NAME, size: 10 };
+  ws.getCell("O5").alignment = { horizontal: "center", vertical: "middle" };
+  ws.getCell("O5").border = THIN_BORDER;
+
   const summaryHeaders = [
     { col: 5, label: "PASSED" },
     { col: 6, label: "FAILED" },
@@ -148,7 +161,7 @@ export async function generateExcel(
   for (const c of countifCols) {
     const cell = ws.getCell(7, c.col);
     cell.value = {
-      formula: `COUNTIF($AA$11:$AA9615,"${c.status}")`,
+      formula: `COUNTIF($AA$12:$AA9599,"${c.status}")`,
       result: 0,
     } as ExcelJS.CellFormulaValue;
     cell.font = { name: FONT_NAME, size: 10 };
@@ -166,13 +179,26 @@ export async function generateExcel(
   for (const s of severityCols) {
     const cell = ws.getCell(7, s.col);
     cell.value = {
-      formula: `COUNTIF($Z$11:$Z9615,"${s.level}")`,
+      formula: `COUNTIF($Z$12:$Z9599,"${s.level}")`,
       result: 0,
     } as ExcelJS.CellFormulaValue;
     cell.font = { name: FONT_NAME, size: 10 };
     cell.alignment = { horizontal: "center", vertical: "middle" };
     cell.border = THIN_BORDER;
   }
+
+  // AE6: 자동화 label
+  ws.getCell("AE6").value = "자동화";
+  ws.getCell("AE6").font = { name: FONT_NAME, size: 9, bold: true };
+  ws.getCell("AE6").alignment = { horizontal: "center", vertical: "middle" };
+  ws.getCell("AE6").border = THIN_BORDER;
+  ws.getCell("AE7").value = {
+    formula: 'COUNTIF($AE$12:$AE9598,"O")',
+    result: 0,
+  } as ExcelJS.CellFormulaValue;
+  ws.getCell("AE7").font = { name: FONT_NAME, size: 10 };
+  ws.getCell("AE7").alignment = { horizontal: "center", vertical: "middle" };
+  ws.getCell("AE7").border = THIN_BORDER;
 
   // Row 8: spacing
   ws.getRow(8).height = 9.75;
@@ -219,7 +245,12 @@ export async function generateExcel(
     }
     const cell = ws.getCell(9, h.col);
     cell.value = h.label;
-    cell.font = { name: FONT_NAME, size: 10, bold: true, color: { argb: "FFFFFFFF" } };
+    cell.font = {
+      name: FONT_NAME,
+      size: 10,
+      bold: true,
+      color: { argb: "FFFFFFFF" },
+    };
     cell.alignment = {
       horizontal: "center",
       vertical: "middle",
@@ -234,35 +265,32 @@ export async function generateExcel(
   // --- Write test case data ---
   let currentRow = 11;
 
-  const sectionFill: ExcelJS.FillPattern = {
-    type: "pattern",
-    pattern: "solid",
-    fgColor: { argb: "FF4472C4" },
-  };
-
   for (const section of sections) {
-    // Section header row
+    // Section header row — 예시 파일 스타일: E열에만 경로 텍스트
     const sectionRow = currentRow;
-    const storyCell = ws.getCell(sectionRow, 3);
-    storyCell.value = section.storyId;
-    storyCell.font = { name: FONT_NAME, size: 9 };
-    storyCell.alignment = { horizontal: "center", vertical: "middle" };
-    storyCell.border = THIN_BORDER;
+    ws.getRow(sectionRow).height = 18;
 
+    // E열에 sectionTitle (경로 형식)
     ws.mergeCells(sectionRow, 5, sectionRow, 32);
     const sectionTitleCell = ws.getCell(sectionRow, 5);
     sectionTitleCell.value = section.sectionTitle;
     sectionTitleCell.font = {
       name: FONT_NAME,
-      size: 10,
+      size: 9,
       bold: true,
-      color: { argb: "FFFFFFFF" },
     };
     sectionTitleCell.alignment = { vertical: "middle" };
-    sectionTitleCell.fill = sectionFill;
+    sectionTitleCell.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FFDCE6F1" }, // 연한 파란색 배경
+    };
     applyBorderRange(ws, sectionRow, sectionRow, 3, 32);
 
     currentRow++;
+
+    // TC prefix 결정: section.tcPrefix 또는 storyId
+    const prefix = section.tcPrefix || section.storyId;
 
     // Test case rows
     let tcIndex = 1;
@@ -270,15 +298,9 @@ export async function generateExcel(
       const r = currentRow;
       ws.getRow(r).height = 45;
 
-      // Story ID (C column)
-      const storyIdCell = ws.getCell(r, 3);
-      storyIdCell.value = section.storyId;
-      storyIdCell.font = { name: FONT_NAME, size: 9 };
-      storyIdCell.alignment = { horizontal: "center", vertical: "middle" };
-
-      // TC No. (D column)
+      // TC No. (D column) — 예시: Admin_001
       const tcNoCell = ws.getCell(r, 4);
-      tcNoCell.value = `${section.storyId}-${String(tcIndex).padStart(2, "0")}`;
+      tcNoCell.value = `${prefix}_${String(tcIndex).padStart(3, "0")}`;
       tcNoCell.font = { name: FONT_NAME, size: 9 };
       tcNoCell.alignment = { horizontal: "center", vertical: "middle" };
       tcIndex++;
@@ -355,18 +377,19 @@ export async function generateExcel(
       // Actual Results (W:Y = 23:25)
       ws.mergeCells(r, 23, r, 25);
 
-      // Test Status (AA=27)
+      // Test Status (AA=27) — 기본값 NR
       const statusCell = ws.getCell(r, 27);
       statusCell.value = "NR";
       statusCell.font = { name: "Arial", size: 10, bold: true };
       statusCell.alignment = { horizontal: "center", vertical: "middle" };
 
-      // Doc Page (AC=29) - Figma 프레임명 출처
-      if (tc.docPage) {
-        const docPageCell = ws.getCell(r, 29);
-        docPageCell.value = tc.docPage;
-        docPageCell.font = { name: FONT_NAME, size: 9 };
-        docPageCell.alignment = {
+      // Doc info (AB=28) — Figma 프레임명 출처
+      const docInfoValue = tc.docInfo || tc.docPage;
+      if (docInfoValue) {
+        const docInfoCell = ws.getCell(r, 28);
+        docInfoCell.value = docInfoValue;
+        docInfoCell.font = { name: FONT_NAME, size: 9 };
+        docInfoCell.alignment = {
           horizontal: "center",
           vertical: "middle",
           wrapText: true,

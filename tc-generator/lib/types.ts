@@ -8,12 +8,14 @@ export interface TestCase {
   precondition?: string;
   procedure: string;
   expectedResult: string;
+  docInfo?: string;
   docPage?: string;
 }
 
 export interface TestSection {
   storyId: string;
   sectionTitle: string;
+  tcPrefix?: string;
   testCases: TestCase[];
 }
 
