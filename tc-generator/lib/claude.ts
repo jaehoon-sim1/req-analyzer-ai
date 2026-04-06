@@ -118,7 +118,7 @@ async function generateWithClaude(
   }
 
   // 첫 시도: 8192 tokens → 잘리면 16384로 재시도
-  const tokenLimits = [8192, 16384];
+  const tokenLimits = [16384, 32768];
   let lastText = "";
 
   for (const maxTokens of tokenLimits) {
