@@ -117,36 +117,27 @@ async function generateWithClaude(
     }
   }
 
-  // 첫 시도: 8192 tokens → 잘리면 16384로 재시도
-  const tokenLimits = [16384, 32768];
-  let lastText = "";
+  // 스트리밍 모드로 전체 응답 수집 (타임아웃 방지)
+  let fullText = "";
 
-  for (const maxTokens of tokenLimits) {
-    const message = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: maxTokens,
-      system: TC_SYSTEM_PROMPT,
-      messages: [{ role: "user", content }],
-    });
+  const stream = client.messages.stream({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 16384,
+    system: TC_SYSTEM_PROMPT,
+    messages: [{ role: "user", content }],
+  });
 
-    const textBlock = message.content.find((b) => b.type === "text");
-    if (!textBlock || textBlock.type !== "text") {
-      throw new Error("No response from Claude");
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      fullText += event.delta.text;
     }
-
-    lastText = textBlock.text;
-
-    // stop_reason이 end_turn이면 완전한 응답
-    if (message.stop_reason === "end_turn") {
-      return parseJsonResponse(lastText);
-    }
-
-    // max_tokens로 잘린 경우 → 더 큰 limit으로 재시도
-    console.warn(`[Claude] 응답이 잘림 (stop_reason: ${message.stop_reason}, max_tokens: ${maxTokens}). 재시도...`);
   }
 
-  // 모든 시도 후에도 잘렸으면 복구 시도
-  return parseJsonResponse(lastText);
+  if (!fullText) {
+    throw new Error("No response from Claude");
+  }
+
+  return parseJsonResponse(fullText);
 }
 
 async function generateWithGemini(
