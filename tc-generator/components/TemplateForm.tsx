@@ -18,8 +18,8 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!functionName.trim() || !description.trim()) return;
-    onGenerate({ functionName, description, policies });
+    if (!description.trim()) return;
+    onGenerate({ functionName: functionName || "기능", description, policies });
   };
 
   const descLength = description.length;
@@ -33,15 +33,14 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
 
       <div>
         <label className="block text-sm font-semibold text-gray-700 mb-1">
-          기능명 <span className="text-red-500">*</span>
+          기능명 <span className="text-gray-400 font-normal">(선택)</span>
         </label>
         <input
           type="text"
           value={functionName}
           onChange={(e) => setFunctionName(e.target.value)}
-          placeholder="예: 환자타임조회, 약품정보, 로그인"
+          placeholder="예: 로그인"
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none text-gray-900"
-          required
         />
       </div>
 
@@ -55,7 +54,7 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder={"Figma 디스크립션을 복사하여 붙여넣으세요.\n\n예:\n화면정의\n• 의사랑 진료실 내 환자타임 조회 관련 화면에 대한 정의\n\n공통정책\n• 스크리닝 및 팝업 알림을 위한 백그라운드 모듈은 전체 PC에 설치될 예정\n\n진료실 환경설정\n1-1 약품&참여정보 설정\n• 체크박스\n• 위치: 환경설정 > 처방확인 > 닥터인포 서비스\n• ON: 환자타임조회 스크리닝 모듈 실행 및 환자타임조회 팝업 노출 적용\n• OFF: 환자타임조회 스크리닝 모듈 미실행 및 환자타임조회 팝업 노출 차단"}
+          placeholder={"Figma 디스크립션을 복사하여 붙여넣으세요.\n\n예:\n화면정의\n• 아이디와 비밀번호를 입력하여 로그인하는 화면\n\n화면 구성\n• 아이디 입력 필드 (텍스트)\n• 비밀번호 입력 필드 (마스킹 처리)\n• [로그인] 버튼\n• [아이디 찾기] / [비밀번호 찾기] 링크\n• '아이디 저장' 체크박스\n\n로그인 정책\n• 아이디: 영문+숫자 조합, 4~20자\n• 비밀번호: 영문+숫자+특수문자, 8~20자\n• 로그인 실패 시 '아이디 또는 비밀번호가 일치하지 않습니다' 문구 노출\n• 비밀번호 5회 연속 오류 시 계정 잠금 (30분)\n• 잠금 시 '계정이 잠겼습니다. 30분 후 다시 시도해주세요.' 문구 노출"}
           rows={12}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y text-gray-900 leading-relaxed"
           required
@@ -77,7 +76,7 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
         <textarea
           value={policies}
           onChange={(e) => setPolicies(e.target.value)}
-          placeholder={"추가 정책이나 예외 케이스가 있으면 입력하세요.\n\n예:\n• 비밀번호 5회 오류 시 계정 잠금 (30분)\n• 팝업 노출 조건: 약품정보에 환자타입조회 토글이 ON 상태일 것\n• 해당 Type 팝업이 당일 이미 1회 노출된 의사일 것"}
+          placeholder={"추가 정책이나 예외 케이스가 있으면 입력하세요.\n\n예:\n• 비밀번호 5회 오류 시 계정 잠금 (30분)\n• 잠금 해제 후에도 기존 오류 횟수 초기화\n• 아이디 저장 체크 시 다음 접속 시 아이디 자동 입력\n• 세션 만료 시 자동 로그아웃 후 로그인 페이지로 이동"}
           rows={6}
           className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none resize-y text-gray-900 leading-relaxed"
         />
@@ -97,7 +96,7 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
 
       <button
         type="submit"
-        disabled={isLoading || !functionName.trim() || !description.trim()}
+        disabled={isLoading || !description.trim()}
         className="w-full py-3 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
       >
         {isLoading ? (
