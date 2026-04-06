@@ -593,6 +593,7 @@ export default function Home() {
               onDownload={handleDownload}
               isDownloading={isDownloading}
               onRegenerate={handleRegenerate}
+              onSave={(edited) => setSections(edited)}
               isLoading={isLoading}
             />
           )}
