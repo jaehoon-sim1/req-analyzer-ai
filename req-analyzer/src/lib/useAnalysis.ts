@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import type { AnalysisResult, StreamEvent } from '@/types/analysis';
+import { getCachedResult, cacheResult } from './analysisCache';
 
 interface UseAnalysisReturn {
   result: AnalysisResult | null;
@@ -8,7 +9,8 @@ interface UseAnalysisReturn {
   progressMessage: string;
   currentSection: string | null;
   error: string | null;
-  analyze: (text: string) => Promise<void>;
+  fromCache: boolean;
+  analyze: (text: string, source?: string) => Promise<void>;
   reset: () => void;
 }
 
@@ -19,6 +21,7 @@ export function useAnalysis(): UseAnalysisReturn {
   const [progressMessage, setProgressMessage] = useState('');
   const [currentSection, setCurrentSection] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [fromCache, setFromCache] = useState(false);
 
   const reset = useCallback(() => {
     setResult(null);
@@ -27,10 +30,22 @@ export function useAnalysis(): UseAnalysisReturn {
     setProgressMessage('');
     setCurrentSection(null);
     setError(null);
+    setFromCache(false);
   }, []);
 
-  const analyze = useCallback(async (text: string) => {
+  const analyze = useCallback(async (text: string, source?: string) => {
     reset();
+
+    // 캐시 확인
+    const cached = getCachedResult(text);
+    if (cached) {
+      setFromCache(true);
+      setProgress(100);
+      setProgressMessage('이전 분석 결과를 불러왔습니다 (캐시)');
+      setResult(cached.result);
+      return;
+    }
+
     setIsLoading(true);
 
     const controller = new AbortController();
@@ -88,9 +103,13 @@ export function useAnalysis(): UseAnalysisReturn {
                 setProgress(100);
                 setProgressMessage(event.message || '분석 완료!');
                 break;
-              case 'result':
-                setResult(event.data as AnalysisResult);
+              case 'result': {
+                const analysisResult = event.data as AnalysisResult;
+                setResult(analysisResult);
+                // 결과를 캐시에 저장
+                cacheResult(text, analysisResult, source);
                 break;
+              }
               case 'error':
                 setError(event.message || '분석 중 오류가 발생했습니다.');
                 break;
@@ -119,6 +138,7 @@ export function useAnalysis(): UseAnalysisReturn {
     progressMessage,
     currentSection,
     error,
+    fromCache,
     analyze,
     reset,
   };
