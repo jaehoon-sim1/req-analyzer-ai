@@ -40,6 +40,7 @@ export interface ParsedTC {
   procedure: string;
   expectedResult: string;
   precondition?: string;
+  docInfo?: string;
 }
 
 export interface ParsedTCSection {

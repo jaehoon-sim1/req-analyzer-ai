@@ -30,6 +30,7 @@ export async function parseExcelTC(file: File): Promise<ParsedTCSection[]> {
       if (val.includes("precondition") || val === "사전조건") cells["precondition"] = colNumber;
       if (val.includes("procedure") || val === "테스트 절차") cells["procedure"] = colNumber;
       if (val.includes("expected") || val === "기대 결과") cells["expectedResult"] = colNumber;
+      if (val.includes("doc info") || val === "doc info") cells["docInfo"] = colNumber;
     });
 
     if (cells["procedure"] || cells["tcNo"]) {
@@ -77,6 +78,7 @@ export async function parseExcelTC(file: File): Promise<ParsedTCSection[]> {
       precondition: getCellText(ws, r, colMap["precondition"]) || undefined,
       procedure,
       expectedResult: getCellText(ws, r, colMap["expectedResult"]) || "",
+      docInfo: getCellText(ws, r, colMap["docInfo"]) || undefined,
     };
 
     currentSection.testCases.push(tc);
@@ -122,8 +124,9 @@ export function formatTCsForComparison(sections: ParsedTCSection[]): string {
       const tcs = s.testCases
         .map(
           (tc) =>
-            `[${tc.tcNo}] ${[tc.depth1, tc.depth2, tc.depth3].filter(Boolean).join(" > ")}\n` +
-            `  절차: ${tc.procedure}\n` +
+            `[${tc.tcNo}] ${[tc.depth1, tc.depth2, tc.depth3].filter(Boolean).join(" > ")}` +
+            (tc.docInfo ? ` (출처: ${tc.docInfo})` : "") +
+            `\n  절차: ${tc.procedure}\n` +
             `  기대결과: ${tc.expectedResult}`
         )
         .join("\n");

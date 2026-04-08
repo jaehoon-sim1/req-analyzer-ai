@@ -3,13 +3,13 @@
 import { useState, useCallback, useEffect } from "react";
 import { ComparisonResult, ParsedTCSection } from "@/lib/types";
 import { parseExcelTC, formatTCsForComparison } from "@/lib/excel-parser";
+import {
+  parseFigmaUrl,
+  extractTextFromNodes,
+  extractFrameGroups,
+  FigmaNode,
+} from "@/lib/figma";
 import ProgressDisplay from "./ProgressDisplay";
-
-interface SavedLearnData {
-  name: string;
-  text: string;
-  savedAt: number;
-}
 
 interface Props {
   apiKey: string;
@@ -18,23 +18,24 @@ interface Props {
   setIsLoading: (v: boolean) => void;
 }
 
-function getSavedLearnList(): SavedLearnData[] {
-  try {
-    return JSON.parse(localStorage.getItem("figma_learn_list") || "[]");
-  } catch { return []; }
-}
-
 export default function CompareView({ apiKey, provider, isLoading, setIsLoading }: Props) {
   // TC 입력
-  const [tcInputMode, setTcInputMode] = useState<"excel" | "text">("excel");
+  const [tcInputMode, setTcInputMode] = useState<"excel" | "url">("excel");
   const [tcText, setTcText] = useState("");
   const [tcFileName, setTcFileName] = useState("");
   const [parsedSections, setParsedSections] = useState<ParsedTCSection[] | null>(null);
+  const [excelUrl, setExcelUrl] = useState("");
+  const [urlLoading, setUrlLoading] = useState(false);
+  const [urlError, setUrlError] = useState("");
 
   // 기획서 입력
-  const [reqInputMode, setReqInputMode] = useState<"learn" | "text">("learn");
+  const [reqInputMode, setReqInputMode] = useState<"figma" | "text">("figma");
   const [reqText, setReqText] = useState("");
-  const [savedList, setSavedList] = useState<SavedLearnData[]>([]);
+  const [figmaToken, setFigmaToken] = useState("");
+  const [figmaUrl, setFigmaUrl] = useState("");
+  const [figmaLoading, setFigmaLoading] = useState(false);
+  const [figmaError, setFigmaError] = useState("");
+  const [figmaPageName, setFigmaPageName] = useState("");
 
   // 결과
   const [result, setResult] = useState<ComparisonResult | null>(null);
@@ -42,31 +43,142 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   const [progress, setProgress] = useState<{ percent: number; message: string } | null>(null);
 
   useEffect(() => {
-    setSavedList(getSavedLearnList());
+    const savedToken = localStorage.getItem("figma_access_token");
+    if (savedToken) setFigmaToken(savedToken);
+    const savedUrl = localStorage.getItem("figma_compare_url");
+    if (savedUrl) setFigmaUrl(savedUrl);
+    const savedExcelUrl = localStorage.getItem("compare_excel_url");
+    if (savedExcelUrl) setExcelUrl(savedExcelUrl);
   }, []);
 
-  // Excel 업로드
+  // ===== TC: Excel 업로드 =====
   const handleExcelUpload = useCallback(async (file: File) => {
     try {
       const sections = await parseExcelTC(file);
       setParsedSections(sections);
       setTcFileName(file.name);
-      const totalTCs = sections.reduce((s, sec) => s + sec.testCases.length, 0);
       setTcText(formatTCsForComparison(sections));
       setError("");
-      alert(`${sections.length}개 섹션, ${totalTCs}개 TC 파싱 완료`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Excel 파싱 실패");
     }
   }, []);
 
-  // 학습 데이터 불러오기
-  const handleLoadLearn = (item: SavedLearnData) => {
-    setReqText(item.text);
-    setReqInputMode("text");
-  };
+  // ===== TC: Microsoft 365 Excel URL =====
+  const handleExcelUrl = useCallback(async () => {
+    if (!excelUrl.trim()) return;
+    setUrlLoading(true);
+    setUrlError("");
+    localStorage.setItem("compare_excel_url", excelUrl);
 
-  // 비교 실행
+    try {
+      // Microsoft 365 공유 URL에서 다운로드 URL 생성
+      let downloadUrl = excelUrl;
+
+      if (excelUrl.includes("sharepoint.com") || excelUrl.includes("onedrive.live.com") || excelUrl.includes("1drv.ms")) {
+        // SharePoint/OneDrive URL → download=1 파라미터 추가
+        if (excelUrl.includes("?")) {
+          downloadUrl = excelUrl + "&download=1";
+        } else {
+          downloadUrl = excelUrl + "?download=1";
+        }
+      }
+
+      const res = await fetch("/api/fetch-excel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url: downloadUrl }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || `Excel 가져오기 실패 (${res.status})`);
+      }
+
+      const blob = await res.blob();
+      const file = new File([blob], "online.xlsx", { type: blob.type });
+      await handleExcelUpload(file);
+    } catch (err) {
+      setUrlError(
+        err instanceof Error ? err.message :
+        "Excel URL에서 파일을 가져올 수 없습니다.\nURL이 공유 링크인지 확인하거나, 직접 다운로드 후 업로드해주세요."
+      );
+    } finally {
+      setUrlLoading(false);
+    }
+  }, [excelUrl, handleExcelUpload]);
+
+  // ===== 기획서: Figma 전체 페이지 추출 =====
+  const handleFigmaExtract = useCallback(async () => {
+    if (!figmaToken.trim()) { setFigmaError("Figma 토큰을 입력해주세요."); return; }
+
+    const parsed = parseFigmaUrl(figmaUrl);
+    if (!parsed) { setFigmaError("올바른 Figma URL을 입력해주세요."); return; }
+
+    setFigmaLoading(true);
+    setFigmaError("");
+    localStorage.setItem("figma_access_token", figmaToken.trim());
+    localStorage.setItem("figma_compare_url", figmaUrl);
+
+    try {
+      const { fileKey, nodeId } = parsed;
+      const apiUrl = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${encodeURIComponent(nodeId)}`;
+
+      // 재시도 로직
+      const maxRetries = 3;
+      let res: Response | null = null;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (attempt > 0) {
+          const delay = attempt * 30000;
+          setFigmaError(`Rate limit — ${delay / 1000}초 대기 중 (${attempt}/${maxRetries})...`);
+          await new Promise((r) => setTimeout(r, delay));
+          setFigmaError("");
+        }
+        res = await fetch(apiUrl, { headers: { "X-Figma-Token": figmaToken.trim() } });
+        if (res.status !== 429) break;
+      }
+
+      if (!res || !res.ok) {
+        const errBody = await res?.text().catch(() => "") || "";
+        let errData: Record<string, string> = {};
+        try { errData = JSON.parse(errBody); } catch { /* */ }
+        const errMsg = errData?.message || errData?.err || "";
+        if (res?.status === 429 || errMsg.toLowerCase().includes("rate limit")) {
+          throw new Error("Figma API Rate Limit. 수동 복사 탭을 사용해주세요.");
+        }
+        throw new Error(`Figma 오류 (${res?.status}): ${errMsg || "접근 실패"}`);
+      }
+
+      const data = await res.json();
+      const nodeData = data.nodes?.[nodeId];
+      if (!nodeData?.document) throw new Error("노드를 찾을 수 없습니다.");
+
+      const document = nodeData.document as FigmaNode;
+      const frames = extractFrameGroups(document);
+      const allTexts = extractTextFromNodes(document);
+
+      // 전체 프레임 데이터를 하나의 텍스트로 결합
+      let fullText = "";
+      if (frames.length > 0) {
+        fullText = frames
+          .map((f) => `[프레임: ${f.frameName}]\n${f.texts.join("\n")}`)
+          .join("\n\n");
+      } else {
+        fullText = allTexts.join("\n");
+      }
+
+      if (!fullText.trim()) throw new Error("텍스트를 추출할 수 없습니다.");
+
+      setReqText(fullText);
+      setFigmaPageName(`${document.name} (${frames.length}개 프레임, ${fullText.length}자)`);
+    } catch (err) {
+      setFigmaError(err instanceof Error ? err.message : "Figma 추출 실패");
+    } finally {
+      setFigmaLoading(false);
+    }
+  }, [figmaUrl, figmaToken]);
+
+  // ===== 비교 실행 =====
   const handleCompare = useCallback(async () => {
     if (!tcText.trim()) { setError("TC 데이터를 입력해주세요."); return; }
     if (!reqText.trim()) { setError("기획서 내용을 입력해주세요."); return; }
@@ -84,7 +196,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
         body: JSON.stringify({ tcText, requirementText: reqText, apiKey, provider }),
       });
 
-      if (!res.body) throw new Error("스트리밍을 지원하지 않는 응답입니다.");
+      if (!res.body) throw new Error("스트리밍 미지원");
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
@@ -112,20 +224,15 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
                 throw new Error(data.error);
               }
             } catch (parseErr) {
-              if (parseErr instanceof SyntaxError) {
-                buffer = message + "\n\n" + buffer;
-                break;
-              }
-              if (parseErr instanceof Error && !parseErr.message.includes("Unexpected end")) {
-                throw parseErr;
-              }
+              if (parseErr instanceof SyntaxError) { buffer = message + "\n\n" + buffer; break; }
+              if (parseErr instanceof Error && !parseErr.message.includes("Unexpected end")) throw parseErr;
             }
           }
           boundary = buffer.indexOf("\n\n");
         }
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "비교 분석 중 오류 발생");
+      setError(err instanceof Error ? err.message : "비교 분석 오류");
     } finally {
       setIsLoading(false);
       setProgress(null);
@@ -137,14 +244,13 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
 
   return (
     <div className="space-y-6">
-      {/* 두 패널 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* === TC 입력 === */}
+        {/* ===== TC 입력 ===== */}
         <div className="bg-white rounded-xl shadow-sm border p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-3">기존 TC</h3>
           <div className="flex gap-2 mb-3">
             <button onClick={() => setTcInputMode("excel")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${tcInputMode === "excel" ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>Excel 업로드</button>
-            <button onClick={() => setTcInputMode("text")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${tcInputMode === "text" ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>텍스트 붙여넣기</button>
+            <button onClick={() => setTcInputMode("url")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${tcInputMode === "url" ? "bg-blue-50 border-blue-300 text-blue-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>Excel URL</button>
           </div>
 
           {tcInputMode === "excel" && (
@@ -167,53 +273,86 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
               ) : (
                 <>
                   <svg className="mx-auto h-10 w-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                  <p className="mt-2 text-sm text-gray-500">Excel(.xlsx) 파일을 드래그하거나 클릭</p>
+                  <p className="mt-2 text-sm text-gray-500">Excel(.xlsx) 드래그 또는 클릭</p>
                 </>
               )}
             </div>
           )}
 
-          {tcInputMode === "text" && (
-            <div>
-              <textarea
-                value={tcText}
-                onChange={(e) => setTcText(e.target.value)}
-                placeholder={"기존 TC를 붙여넣으세요.\n\n예:\n[TC_001] 로그인 > 화면 구성\n  절차: 1. 로그인 페이지에 접속한다.\n  기대결과: 로그인 페이지가 노출된다."}
-                rows={8}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none resize-y text-gray-900 font-mono"
+          {tcInputMode === "url" && (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={excelUrl}
+                onChange={(e) => setExcelUrl(e.target.value)}
+                placeholder="Microsoft 365 Excel 공유 URL 붙여넣기"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none text-gray-900"
               />
-              <p className="text-xs text-gray-400 mt-1">{tcText.length.toLocaleString()}자 · ~{tcTokens.toLocaleString()} 토큰</p>
+              <button
+                onClick={handleExcelUrl}
+                disabled={urlLoading || !excelUrl.trim()}
+                className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:bg-gray-400 transition flex items-center justify-center gap-2"
+              >
+                {urlLoading ? (
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>가져오는 중...</>
+                ) : "Excel 가져오기"}
+              </button>
+              {urlError && <p className="text-xs text-red-600 whitespace-pre-line">{urlError}</p>}
+              <p className="text-xs text-gray-400">SharePoint/OneDrive 공유 링크를 입력하세요. 접근 권한이 필요합니다.</p>
+            </div>
+          )}
+
+          {/* TC 파싱 결과 요약 */}
+          {tcText && (
+            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+              TC 로드 완료: {tcText.length.toLocaleString()}자 · ~{tcTokens.toLocaleString()} 토큰
             </div>
           )}
         </div>
 
-        {/* === 기획서 입력 === */}
+        {/* ===== 기획서 입력 ===== */}
         <div className="bg-white rounded-xl shadow-sm border p-5">
           <h3 className="text-sm font-bold text-gray-900 mb-3">기획서 (요구사항)</h3>
           <div className="flex gap-2 mb-3">
-            <button onClick={() => setReqInputMode("learn")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${reqInputMode === "learn" ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>학습 데이터</button>
-            <button onClick={() => setReqInputMode("text")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${reqInputMode === "text" ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>텍스트 붙여넣기</button>
+            <button onClick={() => setReqInputMode("figma")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${reqInputMode === "figma" ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>Figma</button>
+            <button onClick={() => setReqInputMode("text")} className={`px-3 py-1 text-xs font-medium rounded-lg border transition ${reqInputMode === "text" ? "bg-purple-50 border-purple-300 text-purple-700" : "bg-gray-50 border-gray-200 text-gray-500"}`}>수동 복사</button>
           </div>
 
-          {reqInputMode === "learn" && (
-            <div>
-              {savedList.length > 0 ? (
-                <div className="space-y-1.5 max-h-60 overflow-y-auto">
-                  {savedList.map((item) => (
-                    <button
-                      key={item.name}
-                      onClick={() => handleLoadLearn(item)}
-                      className="w-full text-left px-3 py-2 text-sm bg-gray-50 rounded-lg border hover:border-purple-400 hover:bg-purple-50 transition"
-                    >
-                      <span className="font-mono text-purple-700 font-medium">{item.name}</span>
-                      <span className="text-gray-400 ml-2">({item.text.length}자)</span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-6 text-sm text-gray-400">
-                  저장된 학습 데이터가 없습니다.<br />
-                  Figma 탭에서 먼저 데이터를 추출하고 저장하세요.
+          {reqInputMode === "figma" && (
+            <div className="space-y-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Figma Access Token</label>
+                <input
+                  type="password"
+                  value={figmaToken}
+                  onChange={(e) => { setFigmaToken(e.target.value.trim()); localStorage.setItem("figma_access_token", e.target.value.trim()); }}
+                  placeholder="figd_xxxx..."
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none text-gray-900"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Figma 페이지 URL (전체 페이지)</label>
+                <input
+                  type="text"
+                  value={figmaUrl}
+                  onChange={(e) => setFigmaUrl(e.target.value)}
+                  placeholder="https://www.figma.com/design/xxxxx/Name?node-id=0-1"
+                  className="w-full px-3 py-1.5 border border-gray-300 rounded-lg text-sm outline-none text-gray-900"
+                />
+              </div>
+              <button
+                onClick={handleFigmaExtract}
+                disabled={figmaLoading || !figmaUrl.trim()}
+                className="w-full py-2 bg-purple-600 text-white text-sm font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition flex items-center justify-center gap-2"
+              >
+                {figmaLoading ? (
+                  <><svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>추출 중...</>
+                ) : "전체 페이지 추출"}
+              </button>
+              {figmaError && <p className="text-xs text-red-600 whitespace-pre-line">{figmaError}</p>}
+              {figmaPageName && (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+                  {figmaPageName}
                 </div>
               )}
             </div>
@@ -224,11 +363,17 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
               <textarea
                 value={reqText}
                 onChange={(e) => setReqText(e.target.value)}
-                placeholder={"Figma 디스크립션 또는 기획서 내용을 붙여넣으세요.\n\n예:\n화면정의\n• 아이디와 비밀번호를 입력하여 로그인하는 화면\n\n정책\n• 비밀번호 5회 연속 오류 시 계정 잠금 (30분)"}
-                rows={8}
+                placeholder={"Figma에서 Ctrl+A → Ctrl+C로 전체 텍스트를 복사해서 붙여넣으세요.\n\n또는 기획서의 Description 내용을 붙여넣으세요."}
+                rows={10}
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm outline-none resize-y text-gray-900"
               />
-              <p className="text-xs text-gray-400 mt-1">{reqText.length.toLocaleString()}자 · ~{reqTokens.toLocaleString()} 토큰</p>
+            </div>
+          )}
+
+          {/* 기획서 로드 상태 */}
+          {reqText && reqInputMode === "text" && (
+            <div className="mt-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
+              기획서 로드: {reqText.length.toLocaleString()}자 · ~{reqTokens.toLocaleString()} 토큰
             </div>
           )}
         </div>
@@ -251,20 +396,13 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
         </button>
       </div>
 
-      {/* 에러 */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">{error}</div>
-      )}
+      {error && <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700">{error}</div>}
 
-      {/* 진행률 */}
-      {isLoading && progress && (
-        <ProgressDisplay percent={progress.percent} message={progress.message} stage="generating" />
-      )}
+      {isLoading && progress && <ProgressDisplay percent={progress.percent} message={progress.message} stage="generating" />}
 
-      {/* === 비교 결과 === */}
+      {/* ===== 비교 결과 ===== */}
       {result && (
         <div className="space-y-4">
-          {/* 요약 카드 */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="전체 요구사항" value={result.summary.totalRequirements} />
             <SummaryCard label="커버율" value={`${result.summary.coveragePercent}%`} color={result.summary.coveragePercent >= 80 ? "green" : result.summary.coveragePercent >= 50 ? "amber" : "red"} />
@@ -272,17 +410,9 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
             <SummaryCard label="누락 예외케이스" value={result.summary.missingExceptionCount} color={result.summary.missingExceptionCount > 0 ? "amber" : "green"} />
           </div>
 
-          {/* 누락 TC */}
-          {result.missingTCs.length > 0 && (
-            <GapSection title="누락된 TC" items={result.missingTCs} colorClass="red" />
-          )}
+          {result.missingTCs.length > 0 && <GapSection title="누락된 TC" items={result.missingTCs} colorClass="red" />}
+          {result.missingExceptions.length > 0 && <GapSection title="누락된 예외 케이스" items={result.missingExceptions} colorClass="amber" />}
 
-          {/* 누락 예외 케이스 */}
-          {result.missingExceptions.length > 0 && (
-            <GapSection title="누락된 예외 케이스" items={result.missingExceptions} colorClass="amber" />
-          )}
-
-          {/* 커버리지 매트릭스 */}
           {result.coverageMatrix.length > 0 && (
             <div className="bg-white rounded-xl border p-4">
               <h3 className="text-sm font-bold text-gray-900 mb-3">커버리지 매트릭스</h3>
@@ -325,7 +455,6 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
 function SummaryCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
   const bg = color === "green" ? "bg-green-50 border-green-200" : color === "red" ? "bg-red-50 border-red-200" : color === "amber" ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200";
   const textColor = color === "green" ? "text-green-700" : color === "red" ? "text-red-700" : color === "amber" ? "text-amber-700" : "text-gray-700";
-
   return (
     <div className={`rounded-lg border p-3 ${bg}`}>
       <p className="text-xs text-gray-500">{label}</p>
@@ -342,7 +471,6 @@ function GapSection({ title, items, colorClass }: {
   const border = colorClass === "red" ? "border-red-200" : "border-amber-200";
   const bg = colorClass === "red" ? "bg-red-50" : "bg-amber-50";
   const titleColor = colorClass === "red" ? "text-red-800" : "text-amber-800";
-
   return (
     <div className={`rounded-xl border ${border} ${bg} p-4`}>
       <h3 className={`text-sm font-bold ${titleColor} mb-3`}>{title} ({items.length}건)</h3>
