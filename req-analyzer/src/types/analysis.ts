@@ -6,6 +6,7 @@ export interface AnalysisResult {
   ambiguity: AmbiguitySection;
   missingRequirements: MissingSection;
   qaQuestions: QAQuestionSection;
+  flowchart: FlowchartSection;
   metadata: AnalysisMetadata;
 }
 
@@ -81,6 +82,18 @@ export interface QAQuestion {
   question: string;
   context: string;
   priority: 'high' | 'medium' | 'low';
+}
+
+// 플로우차트 (FR-010)
+export interface FlowchartSection {
+  flows: FlowchartItem[];
+  confidence?: ConfidenceLevel;
+}
+
+export interface FlowchartItem {
+  title: string;
+  description: string;
+  mermaid: string;
 }
 
 // 메타데이터
