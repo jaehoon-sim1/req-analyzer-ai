@@ -621,23 +621,40 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
 
           {result.coverageMatrix.length > 0 && (
             <div className="bg-white rounded-xl border p-4">
-              <h3 className="text-sm font-bold text-gray-900 mb-3">커버리지 매트릭스</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-bold text-gray-900">커버리지 매트릭스</h3>
+                <div className="flex gap-3 text-xs text-gray-500">
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-green-400"></span>완전</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-amber-400"></span>부분</span>
+                  <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-red-400"></span>미커버</span>
+                </div>
+              </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-100">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">요구사항</th>
-                      <th className="px-3 py-2 text-left font-medium text-gray-600">매핑 TC</th>
-                      <th className="px-3 py-2 text-center font-medium text-gray-600 w-24">커버리지</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700 w-8">#</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">요구사항</th>
+                      <th className="px-3 py-2.5 text-left font-semibold text-gray-700">매핑 TC</th>
+                      <th className="px-3 py-2.5 text-center font-semibold text-gray-700 w-24">상태</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.coverageMatrix.map((item, i) => (
-                      <tr key={i} className="border-t hover:bg-gray-50">
-                        <td className="px-3 py-2 text-gray-800">{item.requirement}</td>
-                        <td className="px-3 py-2 text-gray-600 text-xs font-mono">{item.matchedTCs.join(", ") || "-"}</td>
-                        <td className="px-3 py-2 text-center">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                      <tr key={i} className={`border-t hover:bg-gray-50 ${item.coverage === "none" ? "bg-red-50/30" : ""}`}>
+                        <td className="px-3 py-2.5 text-gray-400 text-xs">{i + 1}</td>
+                        <td className="px-3 py-2.5 text-gray-800 text-sm">{item.requirement}</td>
+                        <td className="px-3 py-2.5">
+                          {item.matchedTCs.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {item.matchedTCs.map((tc, ti) => (
+                                <span key={ti} className="px-1.5 py-0.5 bg-gray-100 text-gray-600 rounded text-xs font-mono">{tc}</span>
+                              ))}
+                            </div>
+                          ) : <span className="text-xs text-red-400">-</span>}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
                             item.coverage === "full" ? "bg-green-100 text-green-700" :
                             item.coverage === "partial" ? "bg-amber-100 text-amber-700" :
                             "bg-red-100 text-red-700"
@@ -659,14 +676,35 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
 }
 
 function SummaryCard({ label, value, color }: { label: string; value: number | string; color?: string }) {
-  const bg = color === "green" ? "bg-green-50 border-green-200" : color === "red" ? "bg-red-50 border-red-200" : color === "amber" ? "bg-amber-50 border-amber-200" : "bg-gray-50 border-gray-200";
-  const textColor = color === "green" ? "text-green-700" : color === "red" ? "text-red-700" : color === "amber" ? "text-amber-700" : "text-gray-700";
+  const bg = color === "green" ? "bg-green-50 border-green-200" : color === "red" ? "bg-red-50 border-red-200" : color === "amber" ? "bg-amber-50 border-amber-200" : "bg-white border-gray-200";
+  const textColor = color === "green" ? "text-green-700" : color === "red" ? "text-red-700" : color === "amber" ? "text-amber-700" : "text-gray-900";
+  const icon = color === "green" ? "text-green-400" : color === "red" ? "text-red-400" : color === "amber" ? "text-amber-400" : "text-gray-400";
   return (
-    <div className={`rounded-lg border p-3 ${bg}`}>
-      <p className="text-xs text-gray-500">{label}</p>
-      <p className={`text-2xl font-bold ${textColor}`}>{value}</p>
+    <div className={`rounded-xl border p-4 ${bg} shadow-sm`}>
+      <div className="flex items-center justify-between mb-1">
+        <p className="text-xs font-medium text-gray-500">{label}</p>
+        <span className={`text-lg ${icon}`}>
+          {color === "green" ? "\u2713" : color === "red" ? "\u2717" : color === "amber" ? "\u26A0" : "\u2022"}
+        </span>
+      </div>
+      <p className={`text-3xl font-bold ${textColor}`}>{value}</p>
     </div>
   );
+}
+
+/**
+ * 절차 텍스트를 번호 기준으로 줄바꿈 처리
+ * "1. xxx 2. yyy" → ["1. xxx", "2. yyy"]
+ */
+function formatSteps(text: string): string[] {
+  if (!text) return ["-"];
+  // 이미 줄바꿈이 있으면 그대로 사용
+  if (text.includes("\n")) {
+    return text.split("\n").filter((s) => s.trim());
+  }
+  // "1. " "2. " 등 번호 패턴으로 분리
+  const parts = text.split(/(?=\d+\.\s)/).filter((s) => s.trim());
+  return parts.length > 0 ? parts : [text];
 }
 
 function GapSection({ title, items, colorClass }: {
@@ -677,23 +715,43 @@ function GapSection({ title, items, colorClass }: {
   const border = colorClass === "red" ? "border-red-200" : "border-amber-200";
   const bg = colorClass === "red" ? "bg-red-50" : "bg-amber-50";
   const titleColor = colorClass === "red" ? "text-red-800" : "text-amber-800";
+  const accentBorder = colorClass === "red" ? "border-l-red-400" : "border-l-amber-400";
+
   return (
     <div className={`rounded-xl border ${border} ${bg} p-4`}>
       <h3 className={`text-sm font-bold ${titleColor} mb-3`}>{title} ({items.length}건)</h3>
-      <div className="space-y-3">
+      <div className="space-y-4">
         {items.map((item, i) => (
-          <div key={i} className="bg-white rounded-lg border p-3">
-            <div className="flex items-start justify-between mb-2">
-              <p className="text-sm font-medium text-gray-800">{item.requirement}</p>
-              <span className={`shrink-0 ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+          <div key={i} className={`bg-white rounded-lg border border-l-4 ${accentBorder} p-4 shadow-sm`}>
+            {/* 요구사항 + 심각도 */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-start gap-2">
+                <span className="shrink-0 w-6 h-6 rounded-full bg-gray-100 text-gray-500 text-xs flex items-center justify-center font-bold">{i + 1}</span>
+                <p className="text-sm font-semibold text-gray-900 leading-relaxed">{item.requirement}</p>
+              </div>
+              <span className={`shrink-0 ml-3 px-2.5 py-1 rounded-full text-xs font-bold ${
                 item.severity === "high" ? "bg-red-100 text-red-700" :
                 item.severity === "medium" ? "bg-amber-100 text-amber-700" :
                 "bg-gray-100 text-gray-600"
               }`}>{item.severity === "high" ? "높음" : item.severity === "medium" ? "중간" : "낮음"}</span>
             </div>
-            <div className="text-xs text-gray-600 space-y-1">
-              <p><span className="font-medium text-gray-700">제안 절차:</span> {item.suggestedProcedure}</p>
-              <p><span className="font-medium text-gray-700">제안 결과:</span> {item.suggestedExpectedResult}</p>
+
+            {/* 제안 절차 */}
+            <div className="mb-3">
+              <p className="text-xs font-bold text-gray-700 mb-1.5">제안 절차</p>
+              <div className="bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+                {formatSteps(item.suggestedProcedure).map((step, si) => (
+                  <p key={si} className="text-xs text-gray-700 leading-relaxed">{step.trim()}</p>
+                ))}
+              </div>
+            </div>
+
+            {/* 제안 결과 */}
+            <div>
+              <p className="text-xs font-bold text-gray-700 mb-1.5">제안 결과</p>
+              <div className="bg-blue-50 rounded-lg px-3 py-2">
+                <p className="text-xs text-blue-800 leading-relaxed whitespace-pre-line">{item.suggestedExpectedResult}</p>
+              </div>
             </div>
           </div>
         ))}
