@@ -65,6 +65,29 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   }, []);
 
   // ===== TC: Microsoft 365 Excel URL =====
+  // SharePoint URL → download.aspx 변환 (브라우저 인증 세션 활용)
+  function convertToDownloadUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      const hostname = parsed.hostname;
+
+      // SharePoint /:x:/r/ 패턴
+      if (hostname.includes("sharepoint.com")) {
+        const pathMatch = parsed.pathname.match(/\/:x:\/[rg]\/(.+)/);
+        if (pathMatch) {
+          const filePath = "/" + pathMatch[1];
+          const baseMatch = filePath.match(/^(\/personal\/[^/]+)/);
+          if (baseMatch) {
+            return `https://${hostname}${baseMatch[1]}/_layouts/15/download.aspx?SourceUrl=${encodeURIComponent(filePath)}`;
+          }
+        }
+      }
+      return url + (url.includes("?") ? "&" : "?") + "download=1";
+    } catch {
+      return url;
+    }
+  }
+
   const handleExcelUrl = useCallback(async () => {
     if (!excelUrl.trim()) return;
     setUrlLoading(true);
@@ -72,36 +95,61 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
     localStorage.setItem("compare_excel_url", excelUrl);
 
     try {
-      // Microsoft 365 공유 URL에서 다운로드 URL 생성
-      let downloadUrl = excelUrl;
+      // 브라우저에서 직접 다운로드 (SharePoint 인증 세션 활용)
+      const downloadUrl = convertToDownloadUrl(excelUrl);
 
-      if (excelUrl.includes("sharepoint.com") || excelUrl.includes("onedrive.live.com") || excelUrl.includes("1drv.ms")) {
-        // SharePoint/OneDrive URL → download=1 파라미터 추가
-        if (excelUrl.includes("?")) {
-          downloadUrl = excelUrl + "&download=1";
-        } else {
-          downloadUrl = excelUrl + "?download=1";
-        }
-      }
-
-      const res = await fetch("/api/fetch-excel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url: downloadUrl }),
+      const res = await fetch(downloadUrl, {
+        credentials: "include", // 쿠키 포함 → SharePoint 인증
       });
 
       if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || `Excel 가져오기 실패 (${res.status})`);
+        if (res.status === 401 || res.status === 403) {
+          throw new Error(
+            "접근 권한이 없습니다.\n\n" +
+            "대안: Excel Online에서 파일 → 복사본 다운로드 → Excel 업로드"
+          );
+        }
+        throw new Error(`다운로드 실패 (${res.status})`);
       }
 
       const blob = await res.blob();
-      const file = new File([blob], "online.xlsx", { type: blob.type });
+
+      // ZIP 시그니처 확인 (XLSX = ZIP)
+      const header = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+      if (header[0] !== 0x50 || header[1] !== 0x4B) {
+        throw new Error(
+          "Excel 파일이 아닌 응답입니다.\n\n" +
+          "대안: Excel Online에서 파일 → 복사본 다운로드 → Excel 업로드"
+        );
+      }
+
+      const file = new File([blob], "online.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
       await handleExcelUpload(file);
     } catch (err) {
+      // CORS 에러 등으로 fetch 자체가 실패하면 서버 프록시로 폴백
+      if (err instanceof TypeError && err.message.includes("fetch")) {
+        try {
+          const res = await fetch("/api/fetch-excel", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ url: excelUrl }),
+          });
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            throw new Error(errData.error || `서버 프록시 실패 (${res.status})`);
+          }
+          const blob = await res.blob();
+          const file = new File([blob], "online.xlsx", { type: blob.type });
+          await handleExcelUpload(file);
+          return;
+        } catch (proxyErr) {
+          setUrlError(proxyErr instanceof Error ? proxyErr.message : "다운로드 실패");
+          return;
+        }
+      }
       setUrlError(
         err instanceof Error ? err.message :
-        "Excel URL에서 파일을 가져올 수 없습니다.\nURL이 공유 링크인지 확인하거나, 직접 다운로드 후 업로드해주세요."
+        "Excel 파일을 가져올 수 없습니다.\n직접 다운로드 후 업로드해주세요."
       );
     } finally {
       setUrlLoading(false);
