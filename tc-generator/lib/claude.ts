@@ -1,7 +1,8 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import Anthropic from "@anthropic-ai/sdk";
-import { TestSection } from "./types";
+import { TestSection, ComparisonResult } from "./types";
 import { TC_SYSTEM_PROMPT } from "./prompt";
+import { COMPARE_SYSTEM_PROMPT } from "./compare-prompt";
 
 // Corporate proxy SSL workaround (development only)
 if (process.env.NODE_ENV === "development") {
@@ -243,6 +244,122 @@ async function generateWithOpenRouter(
   }
 
   return parseJsonResponse(text);
+}
+
+// === TC vs 기획서 비교 ===
+
+export async function generateComparison(
+  userPrompt: string,
+  apiKey: string,
+  provider: AIProvider = "gemini"
+): Promise<ComparisonResult> {
+  if (!apiKey) throw new Error("API 키가 입력되지 않았습니다.");
+
+  const generate = async () => {
+    if (provider === "claude") {
+      return compareWithClaude(userPrompt, apiKey);
+    }
+    if (provider === "openrouter") {
+      return compareWithOpenRouter(userPrompt, apiKey);
+    }
+    return compareWithGemini(userPrompt, apiKey);
+  };
+
+  return withRetry(generate, provider);
+}
+
+async function compareWithClaude(userPrompt: string, apiKey: string): Promise<ComparisonResult> {
+  const client = new Anthropic({ apiKey });
+  let fullText = "";
+
+  const stream = client.messages.stream({
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 16384,
+    system: COMPARE_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: [{ type: "text", text: userPrompt }] }],
+  });
+
+  for await (const event of stream) {
+    if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
+      fullText += event.delta.text;
+    }
+  }
+
+  if (!fullText) throw new Error("No response from Claude");
+  return parseComparisonResponse(fullText);
+}
+
+async function compareWithGemini(userPrompt: string, apiKey: string): Promise<ComparisonResult> {
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({
+    model: "gemini-2.0-flash",
+    systemInstruction: COMPARE_SYSTEM_PROMPT,
+    generationConfig: { maxOutputTokens: 65536 },
+  });
+
+  const result = await model.generateContent(userPrompt);
+  const text = result.response.text();
+  if (!text) throw new Error("No response from Gemini");
+  return parseComparisonResponse(text);
+}
+
+async function compareWithOpenRouter(userPrompt: string, apiKey: string): Promise<ComparisonResult> {
+  const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "openrouter/free",
+      messages: [
+        { role: "system", content: COMPARE_SYSTEM_PROMPT },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.3,
+    }),
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.error?.message || `OpenRouter 오류 (${res.status})`);
+  }
+
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content;
+  if (!text) throw new Error("No response from OpenRouter");
+  return parseComparisonResponse(text);
+}
+
+function parseComparisonResponse(text: string): ComparisonResult {
+  let jsonText = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+  const jsonStart = jsonText.indexOf("{");
+  const jsonEnd = jsonText.lastIndexOf("}");
+  if (jsonStart !== -1 && jsonEnd > jsonStart) {
+    jsonText = jsonText.slice(jsonStart, jsonEnd + 1);
+  }
+
+  let parsed: ComparisonResult;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch {
+    try {
+      parsed = JSON.parse(fixUnescapedNewlines(jsonText));
+    } catch {
+      const repaired = tryRepairTruncatedJson(fixUnescapedNewlines(jsonText));
+      if (repaired) {
+        parsed = repaired as ComparisonResult;
+      } else {
+        throw new Error("비교 결과를 파싱할 수 없습니다. 다시 시도해주세요.");
+      }
+    }
+  }
+
+  // 기본값 보장
+  return {
+    summary: parsed.summary || { totalRequirements: 0, coveredCount: 0, coveragePercent: 0, missingTCCount: 0, missingExceptionCount: 0 },
+    missingTCs: parsed.missingTCs || [],
+    missingExceptions: parsed.missingExceptions || [],
+    coverageMatrix: parsed.coverageMatrix || [],
+  };
 }
 
 function fixUnescapedNewlines(jsonStr: string): string {

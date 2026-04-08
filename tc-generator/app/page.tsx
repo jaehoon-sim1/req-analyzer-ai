@@ -6,8 +6,10 @@ import PdfUploader from "@/components/PdfUploader";
 import FigmaInput from "@/components/FigmaInput";
 import ResultPreview from "@/components/ResultPreview";
 import ProgressDisplay from "@/components/ProgressDisplay";
+import CompareView from "@/components/CompareView";
 import { TestSection } from "@/lib/types";
 
+type AppMode = "generate" | "compare";
 type Tab = "text" | "pdf" | "figma";
 type AIProvider = "gemini" | "openrouter" | "claude";
 
@@ -42,6 +44,7 @@ const PROVIDER_INFO: Record<
 };
 
 export default function Home() {
+  const [appMode, setAppMode] = useState<AppMode>("generate");
   const [activeTab, setActiveTab] = useState<Tab>("text");
   const [isLoading, setIsLoading] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
@@ -317,12 +320,36 @@ export default function Home() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
-      {/* Header */}
-      <div className="text-center mb-8">
+      {/* Header + Mode Toggle */}
+      <div className="text-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">TC Generator</h1>
         <p className="mt-2 text-gray-500">
-          요구사항을 입력하면 TestCase를 자동으로 생성합니다
+          {appMode === "generate"
+            ? "요구사항을 입력하면 TestCase를 자동으로 생성합니다"
+            : "기존 TC와 기획서를 비교하여 누락된 부분을 찾습니다"}
         </p>
+        <div className="flex justify-center gap-2 mt-4">
+          <button
+            onClick={() => setAppMode("generate")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg border-2 transition ${
+              appMode === "generate"
+                ? "bg-blue-600 border-blue-600 text-white"
+                : "bg-white border-gray-300 text-gray-600 hover:border-blue-300"
+            }`}
+          >
+            TC 생성
+          </button>
+          <button
+            onClick={() => setAppMode("compare")}
+            className={`px-4 py-2 text-sm font-semibold rounded-lg border-2 transition ${
+              appMode === "compare"
+                ? "bg-indigo-600 border-indigo-600 text-white"
+                : "bg-white border-gray-300 text-gray-600 hover:border-indigo-300"
+            }`}
+          >
+            TC 비교
+          </button>
+        </div>
       </div>
 
       {/* AI Provider & API Key Section */}
@@ -387,6 +414,18 @@ export default function Home() {
         </p>
       </div>
 
+      {/* === Compare Mode === */}
+      {appMode === "compare" && (
+        <CompareView
+          apiKey={apiKey}
+          provider={provider}
+          isLoading={isLoading}
+          setIsLoading={setIsLoading}
+        />
+      )}
+
+      {/* === Generate Mode === */}
+      {appMode === "generate" && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Left: Input */}
         <div className="bg-white rounded-xl shadow-sm border p-6">
@@ -599,6 +638,7 @@ export default function Home() {
           )}
         </div>
       </div>
+      )}
     </div>
   );
 }
