@@ -29,6 +29,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   const [urlError, setUrlError] = useState("");
   const [tcParsing, setTcParsing] = useState(false);
   const [tcParseProgress, setTcParseProgress] = useState("");
+  const [selectedSections, setSelectedSections] = useState<Set<number>>(new Set());
 
   // 기획서 입력
   const [reqInputMode, setReqInputMode] = useState<"figma" | "text">("figma");
@@ -43,6 +44,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<{ percent: number; message: string } | null>(null);
+  const [compareInfo, setCompareInfo] = useState<{ sections: string[]; tcCount: number; tokenEstimate: number } | null>(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("figma_access_token");
@@ -60,6 +62,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
         setTcText(cached.text);
         setTcFileName(cached.fileName + " (캐시)");
         setParsedSections(cached.sections);
+        setSelectedSections(new Set((cached.sections as unknown[]).map((_: unknown, i: number) => i)));
       } catch { /* */ }
     }
   }, []);
@@ -86,6 +89,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       setParsedSections(sections);
       setTcFileName(file.name);
       setTcText(text);
+      setSelectedSections(new Set(sections.map((_, i) => i))); // 전체 선택
       setTcParseProgress(`완료! ${sections.length}개 섹션, ${totalTCs}개 TC`);
 
       // 캐시 저장
@@ -267,11 +271,35 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
     }
   }, [figmaUrl, figmaToken]);
 
+  // 선택된 섹션만 필터링한 TC 텍스트 생성
+  const getFilteredTCText = useCallback(() => {
+    if (!parsedSections || selectedSections.size === parsedSections.length) {
+      return tcText; // 전체 선택이면 원본 그대로
+    }
+    const filtered = parsedSections.filter((_, i) => selectedSections.has(i));
+    return formatTCsForComparison(filtered);
+  }, [parsedSections, selectedSections, tcText]);
+
   // ===== 비교 실행 =====
   const handleCompare = useCallback(async () => {
-    if (!tcText.trim()) { setError("TC 데이터를 입력해주세요."); return; }
+    const filteredTC = getFilteredTCText();
+    if (!filteredTC.trim()) { setError("TC 데이터를 입력해주세요."); return; }
     if (!reqText.trim()) { setError("기획서 내용을 입력해주세요."); return; }
     if (!apiKey.trim()) { setError("API 키를 먼저 입력해주세요."); return; }
+
+    // 비교 정보 저장 (결과에 표시용)
+    const sectionNames = parsedSections
+      ? parsedSections.filter((_, i) => selectedSections.has(i)).map((s) => s.sectionTitle)
+      : ["전체"];
+    const filteredTCCount = parsedSections
+      ? parsedSections.filter((_, i) => selectedSections.has(i)).reduce((s, sec) => s + sec.testCases.length, 0)
+      : 0;
+
+    setCompareInfo({
+      sections: sectionNames,
+      tcCount: filteredTCCount,
+      tokenEstimate: Math.ceil((filteredTC.length + reqText.length) / 2),
+    });
 
     setIsLoading(true);
     setError("");
@@ -282,7 +310,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       const res = await fetch("/api/compare", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tcText, requirementText: reqText, apiKey, provider }),
+        body: JSON.stringify({ tcText: filteredTC, requirementText: reqText, apiKey, provider }),
       });
 
       if (!res.body) throw new Error("스트리밍 미지원");
@@ -326,10 +354,17 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       setIsLoading(false);
       setProgress(null);
     }
-  }, [tcText, reqText, apiKey, provider, setIsLoading]);
+  }, [getFilteredTCText, reqText, apiKey, provider, setIsLoading, parsedSections, selectedSections]);
 
-  const tcTokens = Math.ceil(tcText.length / 2);
+  const filteredTCPreview = getFilteredTCText();
+  const tcTokens = Math.ceil(filteredTCPreview.length / 2);
   const reqTokens = Math.ceil(reqText.length / 2);
+  const selectedTCCount = parsedSections
+    ? parsedSections.filter((_, i) => selectedSections.has(i)).reduce((s, sec) => s + sec.testCases.length, 0)
+    : 0;
+  const totalTCCount = parsedSections
+    ? parsedSections.reduce((s, sec) => s + sec.testCases.length, 0)
+    : 0;
 
   return (
     <div className="space-y-6">
@@ -402,22 +437,62 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
 
           {/* TC 파싱 결과 요약 */}
           {tcText && !tcParsing && (
-            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
-              <span className="text-xs text-green-700">
-                TC 로드 완료: {tcText.length.toLocaleString()}자 · ~{tcTokens.toLocaleString()} 토큰
-                {tcFileName.includes("캐시") && " (캐시)"}
-              </span>
-              <button
-                onClick={() => {
-                  setTcText("");
-                  setTcFileName("");
-                  setParsedSections(null);
-                  localStorage.removeItem("compare_tc_cache");
-                }}
-                className="text-xs text-red-500 hover:text-red-700"
-              >
-                초기화
-              </button>
+            <div className="mt-3 space-y-2">
+              <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
+                <span className="text-xs text-green-700">
+                  TC 로드: {selectedTCCount}/{totalTCCount}개 TC 선택 · ~{tcTokens.toLocaleString()} 토큰
+                  {tcFileName.includes("캐시") && " (캐시)"}
+                </span>
+                <button
+                  onClick={() => {
+                    setTcText("");
+                    setTcFileName("");
+                    setParsedSections(null);
+                    setSelectedSections(new Set());
+                    localStorage.removeItem("compare_tc_cache");
+                  }}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  초기화
+                </button>
+              </div>
+
+              {/* 섹션 필터링 체크박스 */}
+              {parsedSections && parsedSections.length > 1 && (
+                <div className="border rounded-lg p-3 max-h-40 overflow-y-auto">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold text-gray-700">비교할 섹션 선택</span>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setSelectedSections(new Set(parsedSections.map((_, i) => i)))}
+                        className="text-xs text-blue-600 hover:text-blue-800"
+                      >전체 선택</button>
+                      <button
+                        onClick={() => setSelectedSections(new Set())}
+                        className="text-xs text-gray-500 hover:text-gray-700"
+                      >전체 해제</button>
+                    </div>
+                  </div>
+                  {parsedSections.map((sec, i) => (
+                    <label key={i} className="flex items-center gap-2 py-1 text-xs cursor-pointer hover:bg-gray-50 rounded px-1">
+                      <input
+                        type="checkbox"
+                        checked={selectedSections.has(i)}
+                        onChange={() => {
+                          setSelectedSections((prev) => {
+                            const next = new Set(prev);
+                            next.has(i) ? next.delete(i) : next.add(i);
+                            return next;
+                          });
+                        }}
+                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                      />
+                      <span className="text-gray-700">{sec.sectionTitle}</span>
+                      <span className="text-gray-400">({sec.testCases.length}건)</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -494,7 +569,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       {/* 토큰 요약 + 비교 버튼 */}
       <div className="flex items-center justify-between">
         <div className="text-xs text-gray-500">
-          총 ~{(tcTokens + reqTokens).toLocaleString()} 토큰 예상
+          TC {selectedTCCount}/{totalTCCount}건 선택 · 총 ~{(tcTokens + reqTokens).toLocaleString()} 토큰 예상
           {tcTokens + reqTokens > 10000 && <span className="text-amber-600 ml-2">⚠ 토큰 사용량 높음</span>}
         </div>
         <button
@@ -515,6 +590,25 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       {/* ===== 비교 결과 ===== */}
       {result && (
         <div className="space-y-4">
+          {/* 비교 정보 배너 */}
+          {compareInfo && (
+            <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-indigo-800">비교 분석 결과</span>
+                <span className="text-xs text-indigo-600">
+                  {compareInfo.tcCount}개 TC · ~{compareInfo.tokenEstimate.toLocaleString()} 토큰 사용
+                </span>
+              </div>
+              <div className="mt-1 flex flex-wrap gap-1">
+                {compareInfo.sections.map((s, i) => (
+                  <span key={i} className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full text-xs">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="전체 요구사항" value={result.summary.totalRequirements} />
             <SummaryCard label="커버율" value={`${result.summary.coveragePercent}%`} color={result.summary.coveragePercent >= 80 ? "green" : result.summary.coveragePercent >= 50 ? "amber" : "red"} />
