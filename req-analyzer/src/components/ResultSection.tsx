@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import type { AnalysisResult, ConfidenceLevel } from '@/types/analysis';
+import mermaid from 'mermaid';
 
 async function downloadExport(result: AnalysisResult, format: 'excel' | 'json') {
   const response = await fetch('/api/export', {
@@ -33,6 +34,7 @@ interface ResultSectionProps {
 const TABS = [
   { key: 'summary', label: '요약', testId: 'section-summary' },
   { key: 'features', label: '기능 목록', testId: 'section-features' },
+  { key: 'flowchart', label: '플로우차트', testId: 'section-flowchart' },
   { key: 'testPoints', label: '테스트 포인트', testId: 'section-test-points' },
   { key: 'ambiguity', label: '모호한 요구사항', testId: 'section-ambiguity' },
   { key: 'missingRequirements', label: '누락 요구사항', testId: 'section-missing' },
@@ -51,11 +53,69 @@ function getSectionConfidence(result: AnalysisResult, key: TabKey): ConfidenceLe
   switch (key) {
     case 'summary': return result.summary.confidence;
     case 'features': return result.features.confidence;
+    case 'flowchart': return result.flowchart?.confidence;
     case 'testPoints': return result.testPoints.confidence;
     case 'ambiguity': return result.ambiguity.confidence;
     case 'missingRequirements': return result.missingRequirements.confidence;
     case 'qaQuestions': return result.qaQuestions.confidence;
   }
+}
+
+function MermaidDiagram({ chart, id }: { chart: string; id: string }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [svg, setSvg] = useState<string>('');
+  const [renderError, setRenderError] = useState<string>('');
+
+  useEffect(() => {
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'dark',
+      themeVariables: {
+        primaryColor: '#6366f1',
+        primaryTextColor: '#e0e7ff',
+        primaryBorderColor: '#818cf8',
+        lineColor: '#6366f1',
+        secondaryColor: '#1e1b4b',
+        tertiaryColor: '#312e81',
+        background: '#0a0a1a',
+        mainBkg: '#1e1b4b',
+        nodeBorder: '#818cf8',
+        clusterBkg: '#1e1b4b',
+        titleColor: '#e0e7ff',
+        edgeLabelBackground: '#1e1b4b',
+      },
+      flowchart: { curve: 'basis', htmlLabels: true },
+    });
+
+    async function render() {
+      try {
+        const { svg: renderedSvg } = await mermaid.render(`mermaid-${id}`, chart);
+        setSvg(renderedSvg);
+        setRenderError('');
+      } catch {
+        setRenderError('플로우차트 렌더링에 실패했습니다.');
+        setSvg('');
+      }
+    }
+    render();
+  }, [chart, id]);
+
+  if (renderError) {
+    return (
+      <div className="bg-gray-950 rounded-lg p-4">
+        <p className="text-xs text-red-400 mb-2">{renderError}</p>
+        <pre className="text-xs text-gray-500 overflow-x-auto whitespace-pre-wrap">{chart}</pre>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      className="bg-gray-950 rounded-lg p-4 overflow-x-auto"
+      dangerouslySetInnerHTML={{ __html: svg }}
+    />
+  );
 }
 
 export default function ResultSection({ result, testId }: ResultSectionProps) {
@@ -107,6 +167,25 @@ export default function ResultSection({ result, testId }: ResultSectionProps) {
                 </div>
               ))}
             </div>
+          </div>
+        );
+
+      case 'flowchart':
+        return (
+          <div data-testid="section-flowchart">
+            {result.flowchart?.flows?.length > 0 ? (
+              <div className="space-y-6">
+                {result.flowchart.flows.map((flow, i) => (
+                  <div key={i}>
+                    <h4 className="text-sm font-semibold text-gray-200 mb-1">{flow.title}</h4>
+                    <p className="text-xs text-gray-400 mb-3">{flow.description}</p>
+                    <MermaidDiagram chart={flow.mermaid} id={`flow-${i}`} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">플로우차트를 생성하지 못했습니다.</p>
+            )}
           </div>
         );
 

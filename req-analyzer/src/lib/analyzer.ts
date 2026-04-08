@@ -8,6 +8,7 @@ import type {
   AmbiguitySection,
   MissingSection,
   QAQuestionSection,
+  FlowchartSection,
   StreamEvent,
 } from '@/types/analysis';
 import { SectionSchemas } from '@/types/schemas';
@@ -18,6 +19,7 @@ import {
   AMBIGUITY_PROMPT,
   MISSING_PROMPT,
   QA_QUESTIONS_PROMPT,
+  FLOWCHART_PROMPT,
 } from './prompts/v1';
 
 const MODEL = process.env.ANTHROPIC_MODEL || 'claude-haiku-4-5-20251001';
@@ -112,6 +114,7 @@ const SECTIONS: SectionConfig[] = [
   { key: 'ambiguity', prompt: AMBIGUITY_PROMPT, label: '모호성 탐지' },
   { key: 'missingRequirements', prompt: MISSING_PROMPT, label: '누락 요구사항 탐지' },
   { key: 'qaQuestions', prompt: QA_QUESTIONS_PROMPT, label: 'QA 질문 생성' },
+  { key: 'flowchart', prompt: FLOWCHART_PROMPT, label: '플로우차트 생성' },
 ];
 
 export async function analyzeRequirements(
@@ -180,6 +183,9 @@ export async function analyzeRequirements(
         case 'qaQuestions':
           result.qaQuestions = parseAndValidate(response, SectionSchemas.qaQuestions) as QAQuestionSection;
           break;
+        case 'flowchart':
+          result.flowchart = parseAndValidate(response, SectionSchemas.flowchart) as FlowchartSection;
+          break;
       }
     } catch (parseErr) {
       // Parse/validation failed — retry the API call once more
@@ -206,6 +212,9 @@ export async function analyzeRequirements(
           case 'qaQuestions':
             result.qaQuestions = parseAndValidate(retryResponse, SectionSchemas.qaQuestions) as QAQuestionSection;
             break;
+          case 'flowchart':
+            result.flowchart = parseAndValidate(retryResponse, SectionSchemas.flowchart) as FlowchartSection;
+            break;
         }
       } catch (retryErr) {
         // Both attempts failed — use fallback empty data and track in failedSections
@@ -231,7 +240,7 @@ export async function analyzeRequirements(
     });
   });
 
-  // Run all 6 section API calls concurrently
+  // Run all 7 section API calls concurrently
   await Promise.allSettled(tasks.map((task) => task()));
 
   const processingTimeMs = Date.now() - startTime;
@@ -243,6 +252,7 @@ export async function analyzeRequirements(
     ambiguity: result.ambiguity || { items: [] },
     missingRequirements: result.missingRequirements || { items: [] },
     qaQuestions: result.qaQuestions || { questions: [] },
+    flowchart: result.flowchart || { flows: [] },
     metadata: {
       analyzedAt: new Date().toISOString(),
       inputLength: input.length,

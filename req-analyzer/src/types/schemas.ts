@@ -73,6 +73,18 @@ export const QAQuestionSectionSchema = z.object({
   confidence: confidenceSchema,
 });
 
+// FlowchartSection schema
+export const FlowchartItemSchema = z.object({
+  title: z.string(),
+  description: z.string(),
+  mermaid: z.string(),
+});
+
+export const FlowchartSectionSchema = z.object({
+  flows: z.array(FlowchartItemSchema),
+  confidence: confidenceSchema,
+});
+
 // Map of section keys to their schemas
 export const SectionSchemas = {
   summary: SummarySectionSchema,
@@ -81,6 +93,7 @@ export const SectionSchemas = {
   ambiguity: AmbiguitySectionSchema,
   missingRequirements: MissingSectionSchema,
   qaQuestions: QAQuestionSectionSchema,
+  flowchart: FlowchartSectionSchema,
 } as const;
 
 export type SectionSchemaKey = keyof typeof SectionSchemas;
