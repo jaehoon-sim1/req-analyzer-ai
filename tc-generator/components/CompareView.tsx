@@ -612,12 +612,12 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <SummaryCard label="전체 요구사항" value={result.summary.totalRequirements} />
             <SummaryCard label="커버율" value={`${result.summary.coveragePercent}%`} color={result.summary.coveragePercent >= 80 ? "green" : result.summary.coveragePercent >= 50 ? "amber" : "red"} />
-            <SummaryCard label="누락 TC" value={result.summary.missingTCCount} color={result.summary.missingTCCount > 0 ? "red" : "green"} />
-            <SummaryCard label="누락 예외케이스" value={result.summary.missingExceptionCount} color={result.summary.missingExceptionCount > 0 ? "amber" : "green"} />
+            <SummaryCard label="누락 TC (기획서)" value={result.summary.missingTCCount} color={result.summary.missingTCCount > 0 ? "red" : "green"} />
+            <SummaryCard label="예외 케이스 (QA)" value={result.summary.missingExceptionCount} color={result.summary.missingExceptionCount > 0 ? "amber" : "green"} />
           </div>
 
-          {result.missingTCs.length > 0 && <GapSection title="누락된 TC" items={result.missingTCs} colorClass="red" />}
-          {result.missingExceptions.length > 0 && <GapSection title="누락된 예외 케이스" items={result.missingExceptions} colorClass="amber" />}
+          {result.missingTCs.length > 0 && <GapSection title="누락된 TC (기획서에 명시된 요구사항)" subtitle="기획서에 작성되어 있지만 TC로 커버되지 않은 항목" items={result.missingTCs} colorClass="red" />}
+          {result.missingExceptions.length > 0 && <GapSection title="예외 케이스 제안 (QA 추론)" subtitle="기획서에 명시되지 않았지만 QA 관점에서 테스트가 필요한 항목" items={result.missingExceptions} colorClass="amber" />}
 
           {result.coverageMatrix.length > 0 && (
             <div className="bg-white rounded-xl border p-4">
@@ -707,19 +707,22 @@ function formatSteps(text: string): string[] {
   return parts.length > 0 ? parts : [text];
 }
 
-function GapSection({ title, items, colorClass }: {
+function GapSection({ title, subtitle, items, colorClass }: {
   title: string;
+  subtitle?: string;
   items: { requirement: string; severity: string; suggestedProcedure: string; suggestedExpectedResult: string }[];
   colorClass: string;
 }) {
   const border = colorClass === "red" ? "border-red-200" : "border-amber-200";
   const bg = colorClass === "red" ? "bg-red-50" : "bg-amber-50";
   const titleColor = colorClass === "red" ? "text-red-800" : "text-amber-800";
+  const subtitleColor = colorClass === "red" ? "text-red-600" : "text-amber-600";
   const accentBorder = colorClass === "red" ? "border-l-red-400" : "border-l-amber-400";
 
   return (
     <div className={`rounded-xl border ${border} ${bg} p-4`}>
-      <h3 className={`text-sm font-bold ${titleColor} mb-3`}>{title} ({items.length}건)</h3>
+      <h3 className={`text-sm font-bold ${titleColor}`}>{title} ({items.length}건)</h3>
+      {subtitle && <p className={`text-xs ${subtitleColor} mb-3 mt-0.5`}>{subtitle}</p>}
       <div className="space-y-4">
         {items.map((item, i) => (
           <div key={i} className={`bg-white rounded-lg border border-l-4 ${accentBorder} p-4 shadow-sm`}>
