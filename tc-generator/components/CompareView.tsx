@@ -27,6 +27,8 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   const [excelUrl, setExcelUrl] = useState("");
   const [urlLoading, setUrlLoading] = useState(false);
   const [urlError, setUrlError] = useState("");
+  const [tcParsing, setTcParsing] = useState(false);
+  const [tcParseProgress, setTcParseProgress] = useState("");
 
   // 기획서 입력
   const [reqInputMode, setReqInputMode] = useState<"figma" | "text">("figma");
@@ -49,18 +51,57 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
     if (savedUrl) setFigmaUrl(savedUrl);
     const savedExcelUrl = localStorage.getItem("compare_excel_url");
     if (savedExcelUrl) setExcelUrl(savedExcelUrl);
+
+    // 캐시된 TC 데이터 복원
+    const cachedTC = localStorage.getItem("compare_tc_cache");
+    if (cachedTC) {
+      try {
+        const cached = JSON.parse(cachedTC);
+        setTcText(cached.text);
+        setTcFileName(cached.fileName + " (캐시)");
+        setParsedSections(cached.sections);
+      } catch { /* */ }
+    }
   }, []);
 
   // ===== TC: Excel 업로드 =====
   const handleExcelUpload = useCallback(async (file: File) => {
+    setTcParsing(true);
+    setTcParseProgress("Excel 파일 읽는 중...");
+    setError("");
+
     try {
+      // 약간의 딜레이로 UI 렌더링 보장
+      await new Promise((r) => setTimeout(r, 50));
+      setTcParseProgress("시트 분석 중...");
+      await new Promise((r) => setTimeout(r, 50));
+
       const sections = await parseExcelTC(file);
+      setTcParseProgress("TC 데이터 변환 중...");
+      await new Promise((r) => setTimeout(r, 50));
+
+      const text = formatTCsForComparison(sections);
+      const totalTCs = sections.reduce((s, sec) => s + sec.testCases.length, 0);
+
       setParsedSections(sections);
       setTcFileName(file.name);
-      setTcText(formatTCsForComparison(sections));
-      setError("");
+      setTcText(text);
+      setTcParseProgress(`완료! ${sections.length}개 섹션, ${totalTCs}개 TC`);
+
+      // 캐시 저장
+      try {
+        localStorage.setItem("compare_tc_cache", JSON.stringify({
+          text,
+          fileName: file.name,
+          sections,
+          savedAt: Date.now(),
+        }));
+      } catch { /* localStorage full */ }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Excel 파싱 실패");
+      setTcParseProgress("");
+    } finally {
+      setTcParsing(false);
     }
   }, []);
 
@@ -304,12 +345,20 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
           {tcInputMode === "excel" && (
             <div
               onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleExcelUpload(f); }}
-              onClick={() => document.getElementById("tc-excel-input")?.click()}
-              className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:border-blue-400 transition"
+              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && !tcParsing) handleExcelUpload(f); }}
+              onClick={() => { if (!tcParsing) document.getElementById("tc-excel-input")?.click(); }}
+              className={`border-2 border-dashed rounded-lg p-6 text-center transition ${tcParsing ? "border-blue-400 bg-blue-50 cursor-wait" : "cursor-pointer hover:border-blue-400"}`}
             >
               <input id="tc-excel-input" type="file" accept=".xlsx" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleExcelUpload(f); }} className="hidden" />
-              {tcFileName ? (
+              {tcParsing ? (
+                <div className="flex flex-col items-center gap-2">
+                  <svg className="animate-spin h-8 w-8 text-blue-500" viewBox="0 0 24 24" fill="none">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  <p className="text-sm text-blue-600 font-medium">{tcParseProgress}</p>
+                </div>
+              ) : tcFileName ? (
                 <div>
                   <p className="text-sm font-medium text-gray-700">{tcFileName}</p>
                   {parsedSections && (
@@ -317,6 +366,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
                       {parsedSections.length}개 섹션, {parsedSections.reduce((s, sec) => s + sec.testCases.length, 0)}개 TC
                     </p>
                   )}
+                  <p className="text-xs text-blue-500 mt-1">다시 업로드하려면 클릭</p>
                 </div>
               ) : (
                 <>
@@ -351,9 +401,23 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
           )}
 
           {/* TC 파싱 결과 요약 */}
-          {tcText && (
-            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
-              TC 로드 완료: {tcText.length.toLocaleString()}자 · ~{tcTokens.toLocaleString()} 토큰
+          {tcText && !tcParsing && (
+            <div className="mt-3 bg-green-50 border border-green-200 rounded-lg px-3 py-2 flex items-center justify-between">
+              <span className="text-xs text-green-700">
+                TC 로드 완료: {tcText.length.toLocaleString()}자 · ~{tcTokens.toLocaleString()} 토큰
+                {tcFileName.includes("캐시") && " (캐시)"}
+              </span>
+              <button
+                onClick={() => {
+                  setTcText("");
+                  setTcFileName("");
+                  setParsedSections(null);
+                  localStorage.removeItem("compare_tc_cache");
+                }}
+                className="text-xs text-red-500 hover:text-red-700"
+              >
+                초기화
+              </button>
             </div>
           )}
         </div>
