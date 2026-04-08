@@ -11,10 +11,10 @@ const COLUMN_PATTERNS: Record<string, RegExp> = {
   depth5: /depth\s*5|최세부|분류\s*5/i,
   precondition: /precondition|사전\s*조건|전제\s*조건|선행\s*조건/i,
   procedure: /procedure|테스트\s*절차|절차|수행\s*절차|테스트\s*스텝|step/i,
-  expectedResult: /expected|기대\s*결과|예상\s*결과|확인\s*사항|결과/i,
+  expectedResult: /expected\s*result|기대\s*결과|예상\s*결과|확인\s*사항/i,
   docInfo: /doc\s*info|문서\s*정보|출처|참조/i,
   testType: /test\s*type|테스트\s*유형|유형|타입/i,
-  testStatus: /test\s*status|상태|결과\s*상태/i,
+  testStatus: /test\s*status|테스트\s*상태|결과\s*상태/i,
   severity: /severity|심각도|중요도/i,
 };
 
@@ -136,16 +136,29 @@ export async function parseExcelTC(file: File): Promise<ParsedTCSection[]> {
     const tcNo = getCellText(ws, r, colMap["tcNo"]);
     const procedure = getCellText(ws, r, colMap["procedure"]);
 
-    // 빈 행 스킵
-    if (!tcNo && !procedure) {
-      const firstText = getFirstNonEmptyText(ws.getRow(r));
-      if (firstText && firstText.length > 3) {
+    // 섹션 헤더 감지: TC No가 없고, 병합 셀로 넓게 퍼진 텍스트
+    if (!tcNo) {
+      // Depth1 컬럼에만 텍스트가 있고 Procedure에 같은 값이면 → 섹션 헤더 (병합 행)
+      const depth1Text = getCellText(ws, r, colMap["depth1"]);
+      if (depth1Text && (!procedure || procedure === depth1Text)) {
         if (currentSection.testCases.length > 0) {
           sections.push(currentSection);
         }
-        currentSection = { sectionTitle: firstText, testCases: [] };
+        currentSection = { sectionTitle: depth1Text, testCases: [] };
+        continue;
       }
-      continue;
+
+      // Procedure도 없으면 빈 행
+      if (!procedure) {
+        const firstText = getFirstNonEmptyText(ws.getRow(r));
+        if (firstText && firstText.length > 3) {
+          if (currentSection.testCases.length > 0) {
+            sections.push(currentSection);
+          }
+          currentSection = { sectionTitle: firstText, testCases: [] };
+        }
+        continue;
+      }
     }
 
     if (!procedure) continue;
