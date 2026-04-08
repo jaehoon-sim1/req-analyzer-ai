@@ -44,37 +44,17 @@ export async function parseExcelTC(file: File): Promise<ParsedTCSection[]> {
   });
 
   for (const sheet of sortedSheets) {
-    // 병합 셀에서 실제 값 읽기
-    function getCellValueFromSheet(s: ExcelJS.Worksheet, row: number, col: number): string {
-      const cell = s.getCell(row, col);
-      if (cell.value != null) return String(cell.value).trim();
-      if (s.model.merges) {
-        for (const range of s.model.merges) {
-          const [startRef, endRef] = range.split(":");
-          const startCell = s.getCell(startRef);
-          const endCell = s.getCell(endRef);
-          const sRow = Number(startCell.row);
-          const sCol = Number(startCell.col);
-          const eRow = Number(endCell.row);
-          const eCol = Number(endCell.col);
-          if (row >= sRow && row <= eRow && col >= sCol && col <= eCol) {
-            return String(startCell.value || "").trim();
-          }
-        }
-      }
-      return "";
-    }
-
     let sheetBestCount = 0;
     let sheetHeaderRow = -1;
     let sheetColMap: Record<string, number> = {};
 
+    // 헤더 탐색: cell.value만 사용 (병합 셀은 ExcelJS가 값을 복제해줌)
     for (let r = 1; r <= Math.min(30, sheet.rowCount); r++) {
       const cells: Record<string, number> = {};
       let matchCount = 0;
 
       for (let c = 1; c <= Math.min(40, sheet.columnCount); c++) {
-        const val = getCellValueFromSheet(sheet, r, c).toLowerCase();
+        const val = String(sheet.getCell(r, c).value || "").trim().toLowerCase();
         if (!val) continue;
         for (const [field, pattern] of Object.entries(COLUMN_PATTERNS)) {
           if (!cells[field] && pattern.test(val)) {
@@ -91,25 +71,11 @@ export async function parseExcelTC(file: File): Promise<ParsedTCSection[]> {
       }
     }
 
-    // 이 시트가 전체 시트 중 최고 매칭이면 채택
     if (sheetBestCount > bestMatchCount) {
       bestMatchCount = sheetBestCount;
       headerRow = sheetHeaderRow;
       colMap = sheetColMap;
       ws = sheet;
-
-      // 병합된 헤더 (2행에 걸친 경우) 처리
-      if (headerRow > 0) {
-        for (let c = 1; c <= Math.min(40, sheet.columnCount); c++) {
-          const val = getCellValueFromSheet(sheet, headerRow + 1, c).toLowerCase();
-          if (!val) continue;
-          for (const [field, pattern] of Object.entries(COLUMN_PATTERNS)) {
-            if (!colMap[field] && pattern.test(val)) {
-              colMap[field] = c;
-            }
-          }
-        }
-      }
     }
   } // end for each sheet
 
