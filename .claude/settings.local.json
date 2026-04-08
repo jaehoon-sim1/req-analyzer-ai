@@ -103,7 +103,8 @@
       "Bash(curl -s -X POST http://localhost:3456/api/upload -F \"file=@C:/Users/wogns1028/Downloads/배너기능_화면기획서.html;type=text/html\")",
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(''''Filename:'''', d.get\\(''''filename''''\\)\\); print\\(''''Size:'''', d.get\\(''''fileSize''''\\)\\); t=d.get\\(''''text'''',''''''''\\); print\\(''''Text length:'''', len\\(t\\)\\); print\\(''''First 500 chars:''''\\); print\\(t[:500]\\)\")",
       "Bash(curl -s http://localhost:3456/)",
-      "Bash(curl -v http://localhost:3456/)"
+      "Bash(curl -v http://localhost:3456/)",
+      "Bash(node -e ':*)"
     ]
   }
 }
