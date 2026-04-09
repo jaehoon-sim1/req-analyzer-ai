@@ -8,6 +8,7 @@ export const TEST_POINTS_PROMPT = `당신은 QA 테스트 전문가입니다.
 2. 정상 케이스뿐만 아니라 예외/경계값 케이스도 포함하세요.
 3. 카테고리: "기능테스트", "예외처리", "경계값", "성능", "보안", "UI/UX"
 4. 우선순위: "high", "medium", "low"
+5. 입력이 [페이지명] 구분자로 나뉜 다중 페이지일 수 있습니다. 페이지 순서에 관계없이 전체 맥락을 파악하여 논리적 흐름에 맞게 테스트 포인트를 정리하세요.
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
 {"testPoints": [{"id": 1, "category": "카테고리", "description": "설명", "priority": "high|medium|low"}], "confidence": "high" | "medium" | "low"  // 분석 결과에 대한 신뢰도}`;

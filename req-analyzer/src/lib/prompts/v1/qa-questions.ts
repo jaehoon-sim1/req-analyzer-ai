@@ -8,6 +8,7 @@ export const QA_QUESTIONS_PROMPT = `당신은 QA 엔지니어입니다.
 2. 누락된 요구사항을 확인하기 위한 질문을 포함하세요.
 3. 질문은 개방형이어야 합니다.
 4. 우선순위: "high"(구현 차단), "medium"(설계 영향), "low"(개선)
+5. 입력이 [페이지명] 구분자로 나뉜 다중 페이지일 수 있습니다. 페이지 순서에 관계없이 전체 맥락을 파악하여, 페이지 간 관계와 흐름에 대한 질문도 포함하세요.
 
 ## 출력 형식 (JSON만 출력, 다른 텍스트 없이)
 {"questions": [{"id": 1, "question": "질문", "context": "배경", "priority": "high|medium|low"}], "confidence": "high" | "medium" | "low"  // 분석 결과에 대한 신뢰도}`;
