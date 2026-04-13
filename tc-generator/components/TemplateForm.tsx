@@ -322,23 +322,6 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
             >
               게시판 기능
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFunctionName("환자타입조회");
-                if (inputMode === "single") {
-                  setDescription(SAMPLE_PATIENT_SINGLE);
-                  setPolicies(SAMPLE_PATIENT_POLICY);
-                } else {
-                  setPages(SAMPLE_PATIENT_PAGES.map((p, i) => ({ id: `sample-${i}`, name: p.name, text: p.text })));
-                  setActivePageId("sample-0");
-                  setPolicies(SAMPLE_PATIENT_POLICY);
-                }
-              }}
-              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 border border-gray-200 hover:border-blue-300 transition"
-            >
-              환자타입조회
-            </button>
           </div>
         </div>
       )}
@@ -475,57 +458,3 @@ const SAMPLE_BOARD_PAGES = [
   },
 ];
 
-const SAMPLE_PATIENT_SINGLE = `화면정의
-• 의사랑 진료실 내 환자타입 조회 관련 화면에 대한 정의
-
-진료실 환경설정
-1-1 약품&참여정보 설정
-• 체크박스
-• 위치: 환경설정 > 처방확인 > 닥터인포 서비스
-• ON: 환자타입조회 스크리닝 모듈 실행 및 환자타입조회 팝업 노출 적용
-• OFF: 환자타입조회 스크리닝 모듈 미실행 및 환자타입조회 팝업 노출 차단
-
-환자타입조회 알림 팝업
-• 진료실에서 조건에 맞는 환자 선택(차트 불러오기) 시 팝업 제공
-• 노출 위치: 화면 우하단
-• 팝업 타이틀(공통): 닥터인포 알림
-• 닫기 [X]버튼 클릭 시 해당 팝업창 닫힘
-• 본문 영역: Type별 설정된 텍스트 표시
-• [상세정보 보기] 버튼: 해당 닥터인포 약품정보 컨텐츠 Open
-• [해당정보 보지 않기] 버튼: 해당 Type 팝업이 더 이상 제공되지 않음`;
-
-const SAMPLE_PATIENT_POLICY = `• 팝업 노출 조건 (모두 충족):
-  - 약품정보에 환자타입조회 토글이 ON 상태일 것
-  - 현재 설정된 환자타입조회 진행 기간 일 것
-  - 해당 요양기관이 타겟 지역에 해당할 것
-  - 해당 요양기관에 타겟 진료과 PC가 1대 이상 존재할 것
-• 노출 제한 조건:
-  - 해당 Type에 대해 의사의 [해당정보 보지 않기] 클릭한 이력이 없을 것
-  - 해당 Type 팝업이 당일 이미 1회 노출된 의사일 것`;
-
-const SAMPLE_PATIENT_PAGES = [
-  {
-    name: "진료실 환경설정",
-    text: `진료실 환경설정
-1-1 약품&참여정보 설정
-• 체크박스
-• 위치: 환경설정 > 처방확인 > 닥터인포 서비스
-• ON: 환자타입조회 스크리닝 모듈 실행 및 환자타입조회 팝업 노출 적용
-• OFF: 환자타입조회 스크리닝 모듈 미실행 및 환자타입조회 팝업 노출 차단`,
-  },
-  {
-    name: "알림 팝업",
-    text: `환자타입조회 알림 팝업
-• 진료실에서 조건에 맞는 환자 선택(차트 불러오기) 시 팝업 제공
-• 노출 위치: 화면 우하단
-• 팝업 타이틀(공통): 닥터인포 알림
-• 닫기 [X]버튼 클릭 시 해당 팝업창 닫힘
-• 본문 영역: Type별 설정된 텍스트 표시`,
-  },
-  {
-    name: "팝업 버튼",
-    text: `팝업 버튼 동작
-• [상세정보 보기] 버튼: 해당 닥터인포 약품정보 컨텐츠 Open, 스케줄팝업의 버튼과 동일하게 구동
-• [해당정보 보지 않기] 버튼: 팝업 닫히며, 해당 의사(TID)에게 해당 Type의 팝업이 더 이상 제공되지 않음, 스케줄팝업의 버튼과 동일하게 구동`,
-  },
-];
