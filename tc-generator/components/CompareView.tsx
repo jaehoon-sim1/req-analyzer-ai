@@ -566,6 +566,41 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
         </div>
       </div>
 
+      {/* 샘플 데이터 */}
+      {!tcText.trim() && !reqText.trim() && (
+        <div className="border border-dashed border-gray-300 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">샘플 데이터로 비교 테스트</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setTcText(COMPARE_SAMPLE_LOGIN.tc);
+                setReqText(COMPARE_SAMPLE_LOGIN.req);
+                setTcFileName("로그인 TC (샘플)");
+                setParsedSections(null);
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-indigo-50 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 transition"
+            >
+              로그인 비교
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setTcText(COMPARE_SAMPLE_BOARD.tc);
+                setReqText(COMPARE_SAMPLE_BOARD.req);
+                setTcFileName("게시판 TC (샘플)");
+                setParsedSections(null);
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-indigo-50 hover:text-indigo-700 border border-gray-200 hover:border-indigo-300 transition"
+            >
+              게시판 비교
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* 토큰 요약 + 비교 버튼 */}
       <div className="flex items-center justify-between">
         <div className="text-xs text-gray-500">
@@ -762,3 +797,108 @@ function GapSection({ title, subtitle, items, colorClass }: {
     </div>
   );
 }
+
+// ===== 비교 샘플 데이터 =====
+
+const COMPARE_SAMPLE_LOGIN = {
+  tc: `## 로그인
+[Login_001] 로그인 > 화면 구성
+  절차: 1. 로그인 페이지에 접속한다.
+  기대결과: 아이디 입력 필드, 비밀번호 입력 필드, [로그인] 버튼이 노출된다.
+[Login_002] 로그인 > 화면 구성
+  절차: 1. 로그인 페이지의 하단 영역을 확인한다.
+  기대결과: [아이디 찾기], [비밀번호 찾기] 링크가 노출된다.
+[Login_003] 로그인 > 정상 동작
+  절차: 1. 아이디와 비밀번호를 올바르게 입력한다.\n2. [로그인] 버튼을 클릭한다.
+  기대결과: 메인 페이지로 이동한다.
+[Login_004] 로그인 > 입력 검증
+  절차: 1. 아이디를 입력하지 않은 상태에서 [로그인] 버튼을 클릭한다.
+  기대결과: '아이디를 입력해주세요.' 안내 문구가 노출된다.
+[Login_005] 로그인 > 입력 검증
+  절차: 1. 비밀번호를 입력하지 않은 상태에서 [로그인] 버튼을 클릭한다.
+  기대결과: '비밀번호를 입력해주세요.' 안내 문구가 노출된다.
+[Login_006] 로그인 > 인증 실패
+  절차: 1. 잘못된 비밀번호를 입력한다.\n2. [로그인] 버튼을 클릭한다.
+  기대결과: '아이디 또는 비밀번호가 일치하지 않습니다.' 오류 문구가 노출된다.
+[Login_007] 로그인 > 계정 잠금
+  절차: 1. 비밀번호를 5회 연속 잘못 입력한다.
+  기대결과: '계정이 잠겼습니다. 30분 후 다시 시도해주세요.' 문구가 노출된다.`,
+
+  req: `화면정의
+• 아이디와 비밀번호를 입력하여 로그인하는 화면
+
+화면 구성
+• 아이디 입력 필드 (텍스트, 최대 20자)
+• 비밀번호 입력 필드 (마스킹 처리, 최대 20자)
+• [로그인] 버튼
+• [아이디 찾기] / [비밀번호 찾기] 링크
+• '아이디 저장' 체크박스
+• '자동 로그인' 체크박스
+
+로그인 동작
+• 아이디와 비밀번호 입력 후 [로그인] 버튼 클릭 시 인증 처리
+• 인증 성공 시 메인 페이지로 이동
+• 인증 실패 시 '아이디 또는 비밀번호가 일치하지 않습니다.' 오류 문구 노출
+• 아이디 미입력 시 '아이디를 입력해주세요.' 안내 문구 노출
+• 비밀번호 미입력 시 '비밀번호를 입력해주세요.' 안내 문구 노출
+• Enter 키 입력 시 [로그인] 버튼과 동일하게 동작
+
+정책
+• 아이디: 영문+숫자 조합, 4~20자
+• 비밀번호: 영문+숫자+특수문자 조합, 8~20자
+• 비밀번호 5회 연속 오류 시 계정 잠금 (30분)
+• 아이디 저장 체크 시 다음 접속 시 아이디 자동 입력
+• 자동 로그인 체크 시 세션 유지 (30일)
+• 세션 만료 시 자동 로그아웃 후 로그인 페이지로 이동`,
+};
+
+const COMPARE_SAMPLE_BOARD = {
+  tc: `## 게시판
+[Board_001] 게시판 > 목록 화면
+  절차: 1. 게시판 페이지에 접속한다.
+  기대결과: 게시글 번호, 제목, 작성자, 작성일, 조회수 컬럼이 표시된다.
+[Board_002] 게시판 > 목록 화면
+  절차: 1. 게시글 목록의 페이지네이션을 확인한다.
+  기대결과: 한 페이지에 10개씩 표시된다.
+[Board_003] 게시판 > 게시글 작성
+  절차: 1. [글쓰기] 버튼을 클릭한다.\n2. 제목과 내용을 입력한다.\n3. [등록] 버튼을 클릭한다.
+  기대결과: 게시글이 저장되고 목록으로 이동한다.
+[Board_004] 게시판 > 게시글 작성 > 필수값
+  절차: 1. 제목을 입력하지 않고 [등록] 버튼을 클릭한다.
+  기대결과: '제목을 입력해주세요.' 안내 문구가 노출된다.
+[Board_005] 게시판 > 게시글 삭제
+  절차: 1. 본인이 작성한 게시글의 [삭제] 버튼을 클릭한다.
+  기대결과: '정말 삭제하시겠습니까?' 확인 팝업이 노출된다.
+[Board_006] 게시판 > 검색
+  절차: 1. 검색 필드에 키워드를 입력한다.\n2. [검색] 버튼을 클릭한다.
+  기대결과: 검색 결과가 목록에 표시된다.`,
+
+  req: `화면정의
+• 게시글 목록 조회 및 게시글 작성/수정/삭제 기능을 제공하는 게시판 화면
+
+게시글 목록
+• 게시글 번호, 제목, 작성자, 작성일, 조회수 컬럼 표시
+• 한 페이지에 10개씩 표시 (페이지네이션)
+• [글쓰기] 버튼 → 게시글 작성 페이지로 이동
+• 제목 클릭 → 게시글 상세 페이지로 이동
+• 검색: 제목/내용/작성자 검색 가능
+
+게시글 작성
+• 제목 입력 (필수, 최대 100자)
+• 내용 입력 (필수, 에디터 제공)
+• 파일 첨부 (최대 5개, 각 10MB 이하, jpg/png/pdf/docx만 허용)
+• [등록] 버튼 클릭 시 저장 후 목록으로 이동
+• [취소] 버튼 클릭 시 '작성을 취소하시겠습니까?' 확인 팝업 후 목록으로 이동
+
+게시글 수정/삭제
+• 작성자 본인만 수정/삭제 가능
+• 삭제 시 '정말 삭제하시겠습니까?' 확인 팝업 노출
+• 관리자는 모든 게시글 삭제 가능
+
+정책
+• 비로그인 사용자: 목록 조회만 가능, 글쓰기 불가
+• 제목: 필수, 1~100자
+• 내용: 필수, 1~10,000자
+• XSS 방지: HTML 태그 입력 시 이스케이프 처리
+• 파일 업로드 시 바이러스 검사 수행`,
+};
