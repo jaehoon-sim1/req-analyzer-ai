@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { parsePDF, parseDOCX, parseTXT, parseImage } from '@/lib/parsers';
+import { parsePDF, parseDOCX, parseTXT, parseImage, parsePPTX, parseXLSX } from '@/lib/parsers';
 
 export const maxDuration = 300; // OCR 처리 시 충분한 시간 확보 (5분)
 
@@ -22,7 +22,7 @@ function isRateLimited(ip: string): boolean {
 }
 
 const MAX_FILE_SIZE = 500 * 1024 * 1024; // 500MB
-const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.html', '.htm', '.png', '.jpg', '.jpeg'];
+const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt', '.html', '.htm', '.png', '.jpg', '.jpeg', '.pptx', '.xlsx', '.xls'];
 
 export async function POST(request: NextRequest) {
   try {
@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
 
     if (!ALLOWED_EXTENSIONS.includes(ext)) {
       return Response.json(
-        { error: 'PDF, DOCX, TXT, HTML, PNG, JPG 파일만 업로드할 수 있습니다.' },
+        { error: 'PDF, DOCX, TXT, HTML, PPTX, XLSX, PNG, JPG 파일만 업로드할 수 있습니다.' },
         { status: 400 }
       );
     }
@@ -74,6 +74,10 @@ export async function POST(request: NextRequest) {
       text = await parsePDF(buffer);
     } else if (ext === '.docx') {
       text = await parseDOCX(buffer);
+    } else if (ext === '.pptx') {
+      text = await parsePPTX(buffer);
+    } else if (ext === '.xlsx' || ext === '.xls') {
+      text = await parseXLSX(buffer);
     } else if (ext === '.png' || ext === '.jpg' || ext === '.jpeg') {
       text = await parseImage(buffer);
     } else if (ext === '.html' || ext === '.htm') {
