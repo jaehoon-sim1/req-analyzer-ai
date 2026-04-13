@@ -281,6 +281,68 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
         </div>
       )}
 
+      {/* 샘플 데이터 */}
+      {!mergedDescription.trim() && (
+        <div className="border border-dashed border-gray-300 rounded-lg p-3">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-gray-500">샘플 데이터로 테스트</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setFunctionName("로그인");
+                if (inputMode === "single") {
+                  setDescription(SAMPLE_LOGIN_SINGLE);
+                  setPolicies(SAMPLE_LOGIN_POLICY);
+                } else {
+                  setPages(SAMPLE_LOGIN_PAGES.map((p, i) => ({ id: `sample-${i}`, name: p.name, text: p.text })));
+                  setActivePageId("sample-0");
+                  setPolicies(SAMPLE_LOGIN_POLICY);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 border border-gray-200 hover:border-blue-300 transition"
+            >
+              로그인 기능
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFunctionName("게시판");
+                if (inputMode === "single") {
+                  setDescription(SAMPLE_BOARD_SINGLE);
+                  setPolicies(SAMPLE_BOARD_POLICY);
+                } else {
+                  setPages(SAMPLE_BOARD_PAGES.map((p, i) => ({ id: `sample-${i}`, name: p.name, text: p.text })));
+                  setActivePageId("sample-0");
+                  setPolicies(SAMPLE_BOARD_POLICY);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 border border-gray-200 hover:border-blue-300 transition"
+            >
+              게시판 기능
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFunctionName("환자타입조회");
+                if (inputMode === "single") {
+                  setDescription(SAMPLE_PATIENT_SINGLE);
+                  setPolicies(SAMPLE_PATIENT_POLICY);
+                } else {
+                  setPages(SAMPLE_PATIENT_PAGES.map((p, i) => ({ id: `sample-${i}`, name: p.name, text: p.text })));
+                  setActivePageId("sample-0");
+                  setPolicies(SAMPLE_PATIENT_POLICY);
+                }
+              }}
+              className="px-3 py-1.5 text-xs font-medium bg-gray-100 text-gray-700 rounded-lg hover:bg-blue-50 hover:text-blue-700 border border-gray-200 hover:border-blue-300 transition"
+            >
+              환자타입조회
+            </button>
+          </div>
+        </div>
+      )}
+
       <button
         type="submit"
         disabled={isLoading || !mergedDescription.trim()}
@@ -301,3 +363,169 @@ export default function TemplateForm({ onGenerate, isLoading }: Props) {
     </form>
   );
 }
+
+// ===== 샘플 데이터 =====
+
+const SAMPLE_LOGIN_SINGLE = `화면정의
+• 아이디와 비밀번호를 입력하여 로그인하는 화면
+
+화면 구성
+• 아이디 입력 필드 (텍스트, 최대 20자)
+• 비밀번호 입력 필드 (마스킹 처리, 최대 20자)
+• [로그인] 버튼
+• [아이디 찾기] / [비밀번호 찾기] 링크
+• '아이디 저장' 체크박스
+• '자동 로그인' 체크박스
+
+로그인 동작
+• 아이디와 비밀번호 입력 후 [로그인] 버튼 클릭 시 인증 처리
+• 인증 성공 시 메인 페이지로 이동
+• 인증 실패 시 '아이디 또는 비밀번호가 일치하지 않습니다.' 오류 문구 노출
+• 아이디 미입력 시 '아이디를 입력해주세요.' 안내 문구 노출
+• 비밀번호 미입력 시 '비밀번호를 입력해주세요.' 안내 문구 노출
+• Enter 키 입력 시 [로그인] 버튼과 동일하게 동작`;
+
+const SAMPLE_LOGIN_POLICY = `• 아이디: 영문+숫자 조합, 4~20자
+• 비밀번호: 영문+숫자+특수문자 조합, 8~20자
+• 비밀번호 5회 연속 오류 시 계정 잠금 (30분)
+• 잠금 시 '계정이 잠겼습니다. 30분 후 다시 시도해주세요.' 문구 노출
+• 아이디 저장 체크 시 다음 접속 시 아이디 자동 입력
+• 자동 로그인 체크 시 세션 유지 (30일)
+• 세션 만료 시 자동 로그아웃 후 로그인 페이지로 이동`;
+
+const SAMPLE_LOGIN_PAGES = [
+  {
+    name: "화면 구성",
+    text: `화면정의
+• 아이디와 비밀번호를 입력하여 로그인하는 화면
+
+화면 구성
+• 아이디 입력 필드 (텍스트, 최대 20자)
+• 비밀번호 입력 필드 (마스킹 처리, 최대 20자)
+• [로그인] 버튼
+• [아이디 찾기] / [비밀번호 찾기] 링크
+• '아이디 저장' 체크박스
+• '자동 로그인' 체크박스`,
+  },
+  {
+    name: "로그인 동작",
+    text: `로그인 동작
+• 아이디와 비밀번호 입력 후 [로그인] 버튼 클릭 시 인증 처리
+• 인증 성공 시 메인 페이지로 이동
+• 인증 실패 시 '아이디 또는 비밀번호가 일치하지 않습니다.' 오류 문구 노출
+• 아이디 미입력 시 '아이디를 입력해주세요.' 안내 문구 노출
+• 비밀번호 미입력 시 '비밀번호를 입력해주세요.' 안내 문구 노출
+• Enter 키 입력 시 [로그인] 버튼과 동일하게 동작`,
+  },
+];
+
+const SAMPLE_BOARD_SINGLE = `화면정의
+• 게시글 목록 조회 및 게시글 작성/수정/삭제 기능을 제공하는 게시판 화면
+
+게시글 목록
+• 게시글 번호, 제목, 작성자, 작성일, 조회수 컬럼 표시
+• 한 페이지에 10개씩 표시 (페이지네이션)
+• [글쓰기] 버튼 → 게시글 작성 페이지로 이동
+• 제목 클릭 → 게시글 상세 페이지로 이동
+• 검색: 제목/내용/작성자 검색 가능
+
+게시글 작성
+• 제목 입력 (필수, 최대 100자)
+• 내용 입력 (필수, 에디터 제공)
+• 파일 첨부 (최대 5개, 각 10MB 이하)
+• [등록] 버튼 클릭 시 저장 후 목록으로 이동
+• [취소] 버튼 클릭 시 작성 내용 초기화 확인 팝업 후 목록으로 이동
+
+게시글 수정/삭제
+• 작성자 본인만 수정/삭제 가능
+• 삭제 시 '정말 삭제하시겠습니까?' 확인 팝업 노출
+• 관리자는 모든 게시글 삭제 가능`;
+
+const SAMPLE_BOARD_POLICY = `• 비로그인 사용자: 목록 조회만 가능, 글쓰기 불가
+• 제목: 필수, 1~100자
+• 내용: 필수, 1~10,000자
+• 첨부파일: jpg, png, pdf, docx만 허용
+• XSS 방지: HTML 태그 입력 시 이스케이프 처리`;
+
+const SAMPLE_BOARD_PAGES = [
+  {
+    name: "게시글 목록",
+    text: `게시글 목록
+• 게시글 번호, 제목, 작성자, 작성일, 조회수 컬럼 표시
+• 한 페이지에 10개씩 표시 (페이지네이션)
+• [글쓰기] 버튼 → 게시글 작성 페이지로 이동
+• 제목 클릭 → 게시글 상세 페이지로 이동
+• 검색: 제목/내용/작성자 검색 가능`,
+  },
+  {
+    name: "게시글 작성",
+    text: `게시글 작성
+• 제목 입력 (필수, 최대 100자)
+• 내용 입력 (필수, 에디터 제공)
+• 파일 첨부 (최대 5개, 각 10MB 이하)
+• [등록] 버튼 클릭 시 저장 후 목록으로 이동
+• [취소] 버튼 클릭 시 작성 내용 초기화 확인 팝업 후 목록으로 이동`,
+  },
+  {
+    name: "수정/삭제",
+    text: `게시글 수정/삭제
+• 작성자 본인만 수정/삭제 가능
+• 삭제 시 '정말 삭제하시겠습니까?' 확인 팝업 노출
+• 관리자는 모든 게시글 삭제 가능`,
+  },
+];
+
+const SAMPLE_PATIENT_SINGLE = `화면정의
+• 의사랑 진료실 내 환자타입 조회 관련 화면에 대한 정의
+
+진료실 환경설정
+1-1 약품&참여정보 설정
+• 체크박스
+• 위치: 환경설정 > 처방확인 > 닥터인포 서비스
+• ON: 환자타입조회 스크리닝 모듈 실행 및 환자타입조회 팝업 노출 적용
+• OFF: 환자타입조회 스크리닝 모듈 미실행 및 환자타입조회 팝업 노출 차단
+
+환자타입조회 알림 팝업
+• 진료실에서 조건에 맞는 환자 선택(차트 불러오기) 시 팝업 제공
+• 노출 위치: 화면 우하단
+• 팝업 타이틀(공통): 닥터인포 알림
+• 닫기 [X]버튼 클릭 시 해당 팝업창 닫힘
+• 본문 영역: Type별 설정된 텍스트 표시
+• [상세정보 보기] 버튼: 해당 닥터인포 약품정보 컨텐츠 Open
+• [해당정보 보지 않기] 버튼: 해당 Type 팝업이 더 이상 제공되지 않음`;
+
+const SAMPLE_PATIENT_POLICY = `• 팝업 노출 조건 (모두 충족):
+  - 약품정보에 환자타입조회 토글이 ON 상태일 것
+  - 현재 설정된 환자타입조회 진행 기간 일 것
+  - 해당 요양기관이 타겟 지역에 해당할 것
+  - 해당 요양기관에 타겟 진료과 PC가 1대 이상 존재할 것
+• 노출 제한 조건:
+  - 해당 Type에 대해 의사의 [해당정보 보지 않기] 클릭한 이력이 없을 것
+  - 해당 Type 팝업이 당일 이미 1회 노출된 의사일 것`;
+
+const SAMPLE_PATIENT_PAGES = [
+  {
+    name: "진료실 환경설정",
+    text: `진료실 환경설정
+1-1 약품&참여정보 설정
+• 체크박스
+• 위치: 환경설정 > 처방확인 > 닥터인포 서비스
+• ON: 환자타입조회 스크리닝 모듈 실행 및 환자타입조회 팝업 노출 적용
+• OFF: 환자타입조회 스크리닝 모듈 미실행 및 환자타입조회 팝업 노출 차단`,
+  },
+  {
+    name: "알림 팝업",
+    text: `환자타입조회 알림 팝업
+• 진료실에서 조건에 맞는 환자 선택(차트 불러오기) 시 팝업 제공
+• 노출 위치: 화면 우하단
+• 팝업 타이틀(공통): 닥터인포 알림
+• 닫기 [X]버튼 클릭 시 해당 팝업창 닫힘
+• 본문 영역: Type별 설정된 텍스트 표시`,
+  },
+  {
+    name: "팝업 버튼",
+    text: `팝업 버튼 동작
+• [상세정보 보기] 버튼: 해당 닥터인포 약품정보 컨텐츠 Open, 스케줄팝업의 버튼과 동일하게 구동
+• [해당정보 보지 않기] 버튼: 팝업 닫히며, 해당 의사(TID)에게 해당 Type의 팝업이 더 이상 제공되지 않음, 스케줄팝업의 버튼과 동일하게 구동`,
+  },
+];
