@@ -13,6 +13,29 @@ type AppMode = "generate" | "compare";
 type Tab = "text" | "pdf" | "figma";
 type AIProvider = "gemini" | "openrouter" | "claude";
 
+// 결과 캐시 유틸
+function hashText(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) & 0xffffffff;
+  }
+  return hash.toString(36);
+}
+
+function getGenerateCache(key: string): { sections: TestSection[]; functionName: string } | null {
+  try {
+    const raw = localStorage.getItem(`gen_cache_${key}`);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch { return null; }
+}
+
+function setGenerateCache(key: string, sections: TestSection[], functionName: string) {
+  try {
+    localStorage.setItem(`gen_cache_${key}`, JSON.stringify({ sections, functionName, cachedAt: Date.now() }));
+  } catch { /* full */ }
+}
+
 interface ProgressState {
   percent: number;
   message: string;
@@ -103,6 +126,27 @@ export default function Home() {
         return;
       }
 
+      // 캐시 확인 (재생성이 아닌 경우만)
+      if (!body.feedback) {
+        const cacheInput = JSON.stringify({
+          desc: body.description || body.pdfText || body.figmaText || body.imageBase64,
+          pol: body.policies,
+          mode: body.mode,
+        });
+        const cacheKey = hashText(cacheInput);
+        const cached = getGenerateCache(cacheKey);
+        if (cached) {
+          setSections(cached.sections);
+          setFunctionName(cached.functionName);
+          setPrevSections(null);
+          setPrevFunctionName("");
+          setError("");
+          return;
+        }
+        // 나중에 저장할 키 보관
+        (body as Record<string, unknown>).__cacheKey = cacheKey;
+      }
+
       setIsLoading(true);
       setError("");
       setErrorFeedback("");
@@ -166,6 +210,9 @@ export default function Home() {
                     stage: "finalizing",
                   });
                   setSections(data.sections);
+                  // 캐시 저장
+                  const ck = (body as Record<string, unknown>).__cacheKey as string;
+                  if (ck) setGenerateCache(ck, data.sections, data.functionName);
                   setFunctionName(data.functionName);
                   // 성공 시 이전 결과 클리어
                   setPrevSections(null);

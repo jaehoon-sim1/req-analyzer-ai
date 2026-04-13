@@ -11,6 +11,29 @@ import {
 } from "@/lib/figma";
 import ProgressDisplay from "./ProgressDisplay";
 
+// 비교 결과 캐시
+function hashText(text: string): string {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i++) {
+    hash = ((hash << 5) + hash + text.charCodeAt(i)) & 0xffffffff;
+  }
+  return hash.toString(36);
+}
+
+function getCompareCache(key: string): ComparisonResult | null {
+  try {
+    const raw = localStorage.getItem(`compare_cache_${key}`);
+    if (!raw) return null;
+    return JSON.parse(raw).result;
+  } catch { return null; }
+}
+
+function setCompareCache(key: string, result: ComparisonResult) {
+  try {
+    localStorage.setItem(`compare_cache_${key}`, JSON.stringify({ result, cachedAt: Date.now() }));
+  } catch { /* full */ }
+}
+
 interface Props {
   apiKey: string;
   provider: string;
@@ -44,7 +67,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
   const [result, setResult] = useState<ComparisonResult | null>(null);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState<{ percent: number; message: string } | null>(null);
-  const [compareInfo, setCompareInfo] = useState<{ sections: string[]; tcCount: number; tokenEstimate: number } | null>(null);
+  const [compareInfo, setCompareInfo] = useState<{ sections: string[]; tcCount: number; tokenEstimate: number; fromCache?: boolean } | null>(null);
 
   useEffect(() => {
     const savedToken = localStorage.getItem("figma_access_token");
@@ -295,11 +318,22 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
       ? parsedSections.filter((_, i) => selectedSections.has(i)).reduce((s, sec) => s + sec.testCases.length, 0)
       : 0;
 
+    const cacheKey = hashText(filteredTC + reqText);
+
     setCompareInfo({
       sections: sectionNames,
       tcCount: filteredTCCount,
       tokenEstimate: Math.ceil((filteredTC.length + reqText.length) / 2),
     });
+
+    // 캐시 확인
+    const cached = getCompareCache(cacheKey);
+    if (cached) {
+      setResult(cached);
+      setCompareInfo((prev) => prev ? { ...prev, fromCache: true } : prev);
+      setError("");
+      return;
+    }
 
     setIsLoading(true);
     setError("");
@@ -337,6 +371,7 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
               } else if (data.type === "result") {
                 setProgress({ percent: 100, message: "완료!" });
                 setResult(data.data);
+                setCompareCache(cacheKey, data.data);
               } else if (data.type === "error") {
                 throw new Error(data.error);
               }
@@ -631,7 +666,8 @@ export default function CompareView({ apiKey, provider, isLoading, setIsLoading 
               <div className="flex items-center justify-between">
                 <span className="text-sm font-semibold text-indigo-800">비교 분석 결과</span>
                 <span className="text-xs text-indigo-600">
-                  {compareInfo.tcCount}개 TC · ~{compareInfo.tokenEstimate.toLocaleString()} 토큰 사용
+                  {compareInfo.tcCount}개 TC · ~{compareInfo.tokenEstimate.toLocaleString()} 토큰
+                  {compareInfo.fromCache ? " · 캐시 사용 (토큰 0)" : ""}
                 </span>
               </div>
               <div className="mt-1 flex flex-wrap gap-1">
