@@ -55,9 +55,21 @@ export async function POST(request: NextRequest) {
     }
 
     // SharePoint URL 변환 시도
+    // SSRF 방지: 허용된 도메인만 접근
+    try {
+      const parsed = new URL(url);
+      const allowedHosts = ["sharepoint.com", "onedrive.live.com", "1drv.ms", "office.com"];
+      if (!allowedHosts.some((h) => parsed.hostname.endsWith(h))) {
+        return NextResponse.json(
+          { error: "허용되지 않은 URL입니다. SharePoint/OneDrive URL만 지원합니다." },
+          { status: 400 }
+        );
+      }
+    } catch {
+      return NextResponse.json({ error: "올바른 URL 형식이 아닙니다." }, { status: 400 });
+    }
+
     const downloadUrl = convertSharePointUrl(url) || url;
-    console.log("[fetch-excel] Original URL:", url.slice(0, 100));
-    console.log("[fetch-excel] Download URL:", downloadUrl.slice(0, 100));
 
     const res = await fetch(downloadUrl, {
       headers: { "User-Agent": "Mozilla/5.0" },

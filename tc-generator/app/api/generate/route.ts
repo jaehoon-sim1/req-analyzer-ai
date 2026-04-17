@@ -11,6 +11,12 @@ import {
 
 export async function POST(request: NextRequest) {
   try {
+    // 입력 크기 제한 (10MB)
+    const contentLength = parseInt(request.headers.get("content-length") || "0");
+    if (contentLength > 10 * 1024 * 1024) {
+      return NextResponse.json({ error: "요청 크기가 10MB를 초과합니다." }, { status: 413 });
+    }
+
     const body = await request.json();
     const {
       functionName,
